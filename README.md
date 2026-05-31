@@ -22,33 +22,31 @@ claude-kit/
 
 ---
 
-## 설치
+## 사용 방법
 
-### 1. 전역 설정 (최초 1회)
-
-```bash
-# 훅 디렉토리 생성
-mkdir -p ~/.claude/hooks
-
-# 훅 스크립트 복사
-cp core/hooks/pre_tool_use_confirm.sh ~/.claude/hooks/
-cp core/hooks/pre_tool_use_file_guard.sh ~/.claude/hooks/
-chmod +x ~/.claude/hooks/*.sh
-
-# CLAUDE.md 복사
-cp core/global-CLAUDE.md ~/.claude/CLAUDE.md
-```
-
-`core/settings.json`의 `/YOUR_HOME/` 부분을 실제 홈 디렉토리로 교체한 뒤 복사한다.
+### 최초 설치
 
 ```bash
-# 예시 (macOS)
-sed 's|/YOUR_HOME/|/Users/yourname/|g' core/settings.json > ~/.claude/settings.json
+git clone git@github.com:NohTaeHwan/claude-kit.git ~/dev/claude-kit
+cd ~/dev/claude-kit
+./install.sh
 ```
 
-> ⚠️ `~/.claude/settings.json`에 기존 설정(`theme` 등)이 있으면 수동으로 병합한다.
+`install.sh`가 자동으로 처리하는 것:
+- `~/.claude/hooks/` 에 심볼릭 링크 연결 (훅 스크립트)
+- `~/.claude/CLAUDE.md` 에 심볼릭 링크 연결 (전역 행동 규칙)
+- `~/.claude/settings.json` 생성 (HOME 경로 자동 치환, 기존 UI 설정 보존)
 
-### 2. 프로젝트 설정 (새 프로젝트마다)
+### 업데이트
+
+```bash
+git pull         # 훅·CLAUDE.md는 심볼릭 링크로 자동 반영
+./install.sh     # settings.json이 변경된 경우에만 추가 실행
+```
+
+> `install.sh`는 `ln -sf`를 사용하므로 중복 실행해도 안전하다.
+
+### 새 프로젝트 시작
 
 원하는 템플릿을 복사한 뒤 프로젝트에 맞게 커스텀한다.
 
@@ -113,6 +111,10 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 ---
 
 ## 업데이트
+
+### v1.1.0 — 26.06.01
+- `install.sh` 추가 — 심볼릭 링크 설정 + settings.json HOME 경로 자동 치환 + 기존 UI 설정 보존 병합
+- README 사용 방법 섹션 추가
 
 ### v1.0.0 — 26.06.01
 - 최초 릴리즈
