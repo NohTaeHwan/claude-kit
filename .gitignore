@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# 하네스 승인 토큰 (일회성, 커밋 불필요)
+.file_edit_approved
+
+# 환경변수
+.env
+.env.*
+
+.idea
+docs/
