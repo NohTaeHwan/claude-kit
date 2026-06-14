@@ -86,6 +86,8 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 
 ## 프로젝트 템플릿 커스텀 가이드
 
+### Spring Boot
+
 `templates/spring-boot/CLAUDE.md`를 복사한 뒤 아래 항목을 프로젝트에 맞게 채운다.
 
 | 항목 | 설명 |
@@ -94,6 +96,17 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 | 예외 클래스명 | 프로젝트에서 사용하는 비즈니스 예외 클래스명 |
 | 에러코드 체계 | 도메인별 에러코드 prefix 및 목록 |
 | Swagger 그룹 구성 | 도메인별 GroupedOpenApi 구성 |
+| 참고 문서 이정표 | 프로젝트 docs/ 구조에 맞게 표 작성 |
+| Git remote | SSH 원격 주소 |
+
+### Vue
+
+`templates/vue/CLAUDE.md`를 복사한 뒤 아래 항목을 프로젝트에 맞게 채운다.
+
+| 항목 | 설명 |
+|---|---|
+| UI 라이브러리 | Vuetify / Element Plus / shadcn-vue / 없음 등 |
+| API 통신 라이브러리 | axios / fetch 등 |
 | 참고 문서 이정표 | 프로젝트 docs/ 구조에 맞게 표 작성 |
 | Git remote | SSH 원격 주소 |
 
@@ -111,6 +124,10 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 ---
 
 ## 업데이트
+
+### v1.2.0 — 26.06.14
+- `templates/vue/` 추가 — Vue 3 + Vite + TypeScript 프로젝트 CLAUDE.md 시작점
+- Composable·Pinia store·Props/Emits 패턴 코드 예시 포함
 
 ### v1.1.0 — 26.06.01
 - `install.sh` 추가 — 심볼릭 링크 설정 + settings.json HOME 경로 자동 치환 + 기존 UI 설정 보존 병합
