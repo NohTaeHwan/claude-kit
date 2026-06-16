@@ -38,6 +38,8 @@ elif echo "$COMMAND" | grep -iEq "ALTER[[:space:]]+TABLE"; then
     MATCHED_DESC="DDL ALTER TABLE — 스키마 변경"
 elif echo "$COMMAND" | grep -iEq "git[[:space:]]+rebase"; then
     MATCHED_DESC="git rebase — 히스토리 재작성"
+elif echo "$COMMAND" | grep -iEq "(^|[[:space:]]|--)force([[:space:]]|$)"; then
+    MATCHED_DESC="force 옵션 — 강제 실행"
 fi
 
 # ── 패턴 매칭 시 차단 (메시지는 stderr로 출력 — 하네스가 stderr를 Claude에게 전달) ──

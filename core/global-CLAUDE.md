@@ -41,6 +41,7 @@
 - DB 레코드 `INSERT` / `UPDATE` / `DELETE`
 - `ALTER TABLE` — 스키마 파괴적 변경
 - `git rebase` — 히스토리 재작성
+- `--force` 또는 `force` 옵션 포함 명령어 — 강제 실행
 
 **Edit / Write 도구** — PreToolUse 훅(`pre_tool_use_file_guard.sh`)이 아래 민감 파일을 자동 차단함
 
