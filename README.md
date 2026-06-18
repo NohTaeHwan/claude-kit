@@ -16,19 +16,27 @@ claude-kit/
 │       ├── pre_tool_use_confirm.sh    ← Bash SQL/git 차단
 │       └── pre_tool_use_file_guard.sh ← Edit/Write 민감 파일 보호
 └── templates/
-    └── spring-boot/
-        └── CLAUDE.md              ← 프로젝트 CLAUDE.md 시작점
+    ├── spring-boot/
+    │   ├── CLAUDE.md              ← 프로젝트 CLAUDE.md 시작점
+    │   ├── settings.json          ← 프로젝트 .claude/settings.json (Stop 훅 설정)
+    │   └── hooks/
+    │       └── stop_build_check.sh    ← Stop 훅: 컴파일·테스트 자동 검증
+    └── vue/
+        └── CLAUDE.md              ← Vue 3 프로젝트 CLAUDE.md 시작점
 ```
 
 ---
 
 ## 사용 방법
 
+> 설치 전 [주의사항](#주의사항)을 먼저 확인하세요.
+
 ### 최초 설치
 
 ```bash
 git clone git@github.com:NohTaeHwan/claude-kit.git ~/dev/claude-kit
 cd ~/dev/claude-kit
+chmod +x install.sh          # 실행 권한 부여 (최초 1회)
 ./install.sh
 ```
 
@@ -46,14 +54,28 @@ git pull         # 훅·CLAUDE.md는 심볼릭 링크로 자동 반영
 
 > `install.sh`는 `ln -sf`를 사용하므로 중복 실행해도 안전하다.
 
+> ⚠️ **레포 디렉토리를 이동한 경우** 심볼릭 링크가 깨진다. 이동 후 반드시 `./install.sh`를 재실행해야 한다. (스크립트가 깨진 링크를 자동 감지하고 현재 경로로 갱신한다.)
+
 ### 새 프로젝트 시작
 
-원하는 템플릿을 복사한 뒤 프로젝트에 맞게 커스텀한다.
-
 ```bash
-# Spring Boot 프로젝트 예시
-cp templates/spring-boot/CLAUDE.md /path/to/your-project/CLAUDE.md
+# Spring Boot 프로젝트
+./install.sh --project /path/to/your-project spring-boot
+
+# Vue 프로젝트
+./install.sh --project /path/to/your-project vue
 ```
+
+설치되는 파일:
+
+| 템플릿 | 파일 |
+|---|---|
+| spring-boot | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/stop_build_check.sh` |
+| vue | `CLAUDE.md` |
+
+설치 후 `CLAUDE.md`를 열어 프로젝트에 맞게 내용을 채운다.
+
+> 기존 파일이 있으면 `.bak`으로 백업 후 덮어쓴다.
 
 ---
 
@@ -112,6 +134,19 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 
 ---
 
+## 주의사항
+
+> ⚠️ **`python3`가 설치되어 있어야 한다.**
+> `install.sh` 전역 설치 시 `settings.json` 병합에 `python3`를 사용한다.
+> 미설치 환경에서는 설치가 중간에 실패하고 `settings.json`이 생성되지 않는다.
+> 설치 전 `python3 --version`으로 확인할 것.
+
+> ⚠️ **재설치 시 `.bak` 파일이 덮어써진다.**
+> `install.sh`는 기존 파일을 `.bak`으로 백업하지만, 재실행할 때마다 이전 `.bak`을 덮어쓴다.
+> 최초 설치 전 원본을 별도로 보존해야 한다면 수동으로 백업할 것.
+
+---
+
 ## 보호 대상 파일 (Edit/Write 자동 차단)
 
 | 패턴 | 유형 |
@@ -124,6 +159,15 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 ---
 
 ## 업데이트
+
+### v1.4.0 — 26.06.19
+- `install.sh` — `--project` 플래그 추가로 프로젝트 설치 지원 (spring-boot / vue)
+- `install.sh` — 기존 파일 `.bak` 백업 후 덮어쓰도록 개선
+
+### v1.3.0 — 26.06.19
+- `templates/spring-boot/hooks/stop_build_check.sh` 추가 — Stop 훅으로 컴파일·테스트 자동 검증, 실패 시 작업 완료 차단
+- `templates/spring-boot/settings.json` 추가 — Stop 훅 설정 템플릿
+- README 새 프로젝트 시작 가이드 업데이트
 
 ### v1.2.0 — 26.06.14
 - `templates/vue/` 추가 — Vue 3 + Vite + TypeScript 프로젝트 CLAUDE.md 시작점

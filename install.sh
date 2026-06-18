@@ -1,40 +1,119 @@
 #!/bin/bash
 # claude-kit 설치 / 업데이트 스크립트
 #
-# 최초 설치: ./install.sh
-# 이후 업데이트: git pull 후 settings.json이 바뀐 경우에만 ./install.sh 재실행
+# 전역 설치:     ./install.sh
+# 프로젝트 설치: ./install.sh --project /path/to/project spring-boot
+#               ./install.sh --project /path/to/project vue
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-CLAUDE_DIR="$HOME/.claude"
-HOOKS_DIR="$CLAUDE_DIR/hooks"
 
-echo "claude-kit 설치/업데이트 시작..."
-echo ""
+# ── 백업 함수 (실제 파일인 경우에만 — 심볼릭 링크·없는 파일은 건너뜀) ──────
+backup_if_exists() {
+    local file="$1"
+    if [ -f "$file" ] && [ ! -L "$file" ]; then
+        cp "$file" "${file}.bak"
+        echo "[백업] $(basename "$file") → $(basename "$file").bak"
+    fi
+}
 
-# ── 1. 훅 디렉토리 생성 ──────────────────────────────────────────────
-mkdir -p "$HOOKS_DIR"
+# ── 인자 파싱 ─────────────────────────────────────────────────────────────────
+if [ "$1" = "--project" ]; then
 
-# ── 2. 심볼릭 링크 설정 (hooks + global-CLAUDE.md) ──────────────────
-ln -sf "$REPO_DIR/core/hooks/pre_tool_use_confirm.sh" "$HOOKS_DIR/pre_tool_use_confirm.sh"
-ln -sf "$REPO_DIR/core/hooks/pre_tool_use_file_guard.sh" "$HOOKS_DIR/pre_tool_use_file_guard.sh"
-chmod +x "$HOOKS_DIR"/*.sh
-ln -sf "$REPO_DIR/core/global-CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
+    # ── 프로젝트 설치 ────────────────────────────────────────────────────────
+    PROJECT_DIR="$2"
+    TEMPLATE="$3"
 
-echo "[완료] 심볼릭 링크 설정"
-echo "       hooks/  → $HOOKS_DIR"
-echo "       CLAUDE.md → $CLAUDE_DIR/CLAUDE.md"
+    if [ -z "$PROJECT_DIR" ] || [ -z "$TEMPLATE" ]; then
+        echo "사용법: ./install.sh --project /path/to/project [spring-boot|vue]"
+        exit 1
+    fi
 
-# ── 3. settings.json — HOME 경로 치환 후 UI 설정 보존하며 병합 ───────
-SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+    if [ ! -d "$PROJECT_DIR" ]; then
+        echo "오류: 디렉토리가 존재하지 않습니다 — $PROJECT_DIR"
+        exit 1
+    fi
 
-python3 -c "
+    TEMPLATE_DIR="$REPO_DIR/templates/$TEMPLATE"
+    if [ ! -d "$TEMPLATE_DIR" ]; then
+        echo "오류: 지원하지 않는 템플릿입니다 — $TEMPLATE"
+        echo "사용 가능한 템플릿: spring-boot, vue"
+        exit 1
+    fi
+
+    echo "[$TEMPLATE] 프로젝트 설치 시작: $PROJECT_DIR"
+    echo ""
+
+    # CLAUDE.md 복사
+    backup_if_exists "$PROJECT_DIR/CLAUDE.md"
+    cp "$TEMPLATE_DIR/CLAUDE.md" "$PROJECT_DIR/CLAUDE.md"
+    echo "[완료] CLAUDE.md → $PROJECT_DIR/CLAUDE.md"
+
+    # spring-boot 전용: settings.json + Stop 훅 복사
+    if [ "$TEMPLATE" = "spring-boot" ]; then
+        mkdir -p "$PROJECT_DIR/.claude/hooks"
+
+        backup_if_exists "$PROJECT_DIR/.claude/settings.json"
+        cp "$TEMPLATE_DIR/settings.json" "$PROJECT_DIR/.claude/settings.json"
+        echo "[완료] settings.json → $PROJECT_DIR/.claude/settings.json"
+
+        backup_if_exists "$PROJECT_DIR/.claude/hooks/stop_build_check.sh"
+        cp "$TEMPLATE_DIR/hooks/stop_build_check.sh" "$PROJECT_DIR/.claude/hooks/stop_build_check.sh"
+        chmod +x "$PROJECT_DIR/.claude/hooks/stop_build_check.sh"
+        echo "[완료] stop_build_check.sh → $PROJECT_DIR/.claude/hooks/"
+    fi
+
+    echo ""
+    echo "[$TEMPLATE] 프로젝트 설치 완료!"
+    echo "CLAUDE.md를 열어 프로젝트에 맞게 내용을 채워주세요."
+
+else
+
+    # ── 전역 설치 ────────────────────────────────────────────────────────────
+    CLAUDE_DIR="$HOME/.claude"
+    HOOKS_DIR="$CLAUDE_DIR/hooks"
+
+    echo "claude-kit 전역 설치/업데이트 시작..."
+    echo ""
+
+    mkdir -p "$HOOKS_DIR"
+
+    # ── 깨진 심볼릭 링크 감지 (레포 이동 시 발생) ────────────────────────────
+    BROKEN=0
+    for link in "$HOOKS_DIR/pre_tool_use_confirm.sh" "$HOOKS_DIR/pre_tool_use_file_guard.sh" "$CLAUDE_DIR/CLAUDE.md"; do
+        if [ -L "$link" ] && [ ! -e "$link" ]; then
+            BROKEN=1
+        fi
+    done
+    if [ $BROKEN -eq 1 ]; then
+        echo "[감지] 깨진 심볼릭 링크가 있습니다 — 레포 위치가 변경된 것 같습니다."
+        echo "       현재 경로($REPO_DIR)로 링크를 갱신합니다."
+        echo ""
+    fi
+
+    # CLAUDE.md 백업 후 심볼릭 링크
+    backup_if_exists "$CLAUDE_DIR/CLAUDE.md"
+    ln -sf "$REPO_DIR/core/global-CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
+    echo "[완료] CLAUDE.md 심볼릭 링크 → $CLAUDE_DIR/CLAUDE.md"
+
+    # 훅 백업 후 심볼릭 링크
+    backup_if_exists "$HOOKS_DIR/pre_tool_use_confirm.sh"
+    backup_if_exists "$HOOKS_DIR/pre_tool_use_file_guard.sh"
+    ln -sf "$REPO_DIR/core/hooks/pre_tool_use_confirm.sh" "$HOOKS_DIR/pre_tool_use_confirm.sh"
+    ln -sf "$REPO_DIR/core/hooks/pre_tool_use_file_guard.sh" "$HOOKS_DIR/pre_tool_use_file_guard.sh"
+    chmod +x "$HOOKS_DIR"/*.sh
+    echo "[완료] 훅 심볼릭 링크 → $HOOKS_DIR"
+
+    # settings.json 백업 후 생성 (UI 설정 보존)
+    SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+    backup_if_exists "$SETTINGS_FILE"
+
+    python3 -c "
 import json
 
 with open('$REPO_DIR/core/settings.json') as f:
     content = f.read().replace('/YOUR_HOME/', '$HOME/')
     new = json.loads(content)
 
-# 기존 settings.json이 있으면 UI 설정 보존 (theme, alwaysThinkingEnabled 등)
 try:
     with open('$SETTINGS_FILE') as f:
         existing = json.load(f)
@@ -47,8 +126,8 @@ except FileNotFoundError:
 with open('$SETTINGS_FILE', 'w') as f:
     json.dump(new, f, indent=2, ensure_ascii=False)
 "
+    echo "[완료] settings.json → $SETTINGS_FILE"
+    echo ""
+    echo "claude-kit 전역 설치/업데이트 완료!"
 
-echo "[완료] settings.json 생성/업데이트"
-echo "       경로: $SETTINGS_FILE"
-echo ""
-echo "claude-kit 설치/업데이트 완료!"
+fi
