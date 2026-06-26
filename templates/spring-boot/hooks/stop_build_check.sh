@@ -58,4 +58,30 @@ if [ $TEST_EXIT -ne 0 ]; then
     exit 2
 fi
 
+# ── 위험 파일 변경 감지 (코드 리뷰 권장) ─────────────────────────────────────
+# - migration/                  : DB 스키마 변경
+# - /security/ / Security*.java : 인증·인가 설정
+# - /auth/ / Auth*.java         : 인증 로직
+# - /payment/ / Payment*.java   : 결제 로직
+# - .github/workflows/          : CI/CD 파이프라인
+CHANGED_FILES=$(
+    { git diff --name-only HEAD 2>/dev/null
+      git ls-files --others --exclude-standard 2>/dev/null; } | sort -u
+)
+
+if [ -n "$CHANGED_FILES" ]; then
+    RISKY_FILES=$(echo "$CHANGED_FILES" | grep -iE \
+        "migration/|/security/|Security[A-Za-z]+\.(java|kt)|/auth/|Auth[A-Za-z]+\.(java|kt)|/payment/|Payment[A-Za-z]+\.(java|kt)|\.github/workflows/")
+    if [ -n "$RISKY_FILES" ]; then
+        echo "" >&2
+        echo "⚠️  [stop-build-check] 위험도 높은 파일이 변경되었습니다 — /code-review 실행을 권장합니다." >&2
+        echo "" >&2
+        echo "$RISKY_FILES" | sed 's/^/    /' >&2
+        echo "" >&2
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+        echo "▶  /code-review 를 실행하고 리뷰 완료 후 완료 처리하세요." >&2
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    fi
+fi
+
 exit 0

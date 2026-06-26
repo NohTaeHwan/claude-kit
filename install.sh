@@ -48,18 +48,24 @@ if [ "$1" = "--project" ]; then
     cp "$TEMPLATE_DIR/CLAUDE.md" "$PROJECT_DIR/CLAUDE.md"
     echo "[완료] CLAUDE.md → $PROJECT_DIR/CLAUDE.md"
 
-    # spring-boot 전용: settings.json + Stop 훅 복사
-    if [ "$TEMPLATE" = "spring-boot" ]; then
+    # settings.json + hooks/ 복사 (템플릿에 있는 경우 자동 복사)
+    if [ -f "$TEMPLATE_DIR/settings.json" ]; then
         mkdir -p "$PROJECT_DIR/.claude/hooks"
-
         backup_if_exists "$PROJECT_DIR/.claude/settings.json"
         cp "$TEMPLATE_DIR/settings.json" "$PROJECT_DIR/.claude/settings.json"
         echo "[완료] settings.json → $PROJECT_DIR/.claude/settings.json"
+    fi
 
-        backup_if_exists "$PROJECT_DIR/.claude/hooks/stop_build_check.sh"
-        cp "$TEMPLATE_DIR/hooks/stop_build_check.sh" "$PROJECT_DIR/.claude/hooks/stop_build_check.sh"
-        chmod +x "$PROJECT_DIR/.claude/hooks/stop_build_check.sh"
-        echo "[완료] stop_build_check.sh → $PROJECT_DIR/.claude/hooks/"
+    if [ -d "$TEMPLATE_DIR/hooks" ]; then
+        mkdir -p "$PROJECT_DIR/.claude/hooks"
+        for hook in "$TEMPLATE_DIR/hooks/"*.sh; do
+            [ -f "$hook" ] || continue
+            hook_name=$(basename "$hook")
+            backup_if_exists "$PROJECT_DIR/.claude/hooks/$hook_name"
+            cp "$hook" "$PROJECT_DIR/.claude/hooks/$hook_name"
+            chmod +x "$PROJECT_DIR/.claude/hooks/$hook_name"
+            echo "[완료] $hook_name → $PROJECT_DIR/.claude/hooks/"
+        done
     fi
 
     echo ""

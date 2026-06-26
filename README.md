@@ -20,9 +20,12 @@ claude-kit/
     │   ├── CLAUDE.md              ← 프로젝트 CLAUDE.md 시작점
     │   ├── settings.json          ← 프로젝트 .claude/settings.json (Stop 훅 설정)
     │   └── hooks/
-    │       └── stop_build_check.sh    ← Stop 훅: 컴파일·테스트 자동 검증
+    │       └── stop_build_check.sh    ← Stop 훅: 컴파일·테스트 자동 검증 + 위험 파일 경고
     └── vue/
-        └── CLAUDE.md              ← Vue 3 프로젝트 CLAUDE.md 시작점
+        ├── CLAUDE.md              ← Vue 3 프로젝트 CLAUDE.md 시작점
+        ├── settings.json          ← 프로젝트 .claude/settings.json (Stop 훅 설정)
+        └── hooks/
+            └── stop_check.sh          ← Stop 훅: 위험 파일 변경 감지 및 코드 리뷰 권장
 ```
 
 ---
@@ -71,7 +74,7 @@ git pull         # 훅·CLAUDE.md는 심볼릭 링크로 자동 반영
 | 템플릿 | 파일 |
 |---|---|
 | spring-boot | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/stop_build_check.sh` |
-| vue | `CLAUDE.md` |
+| vue | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/stop_check.sh` |
 
 설치 후 `CLAUDE.md`를 열어 프로젝트에 맞게 내용을 채운다.
 
@@ -159,6 +162,12 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 ---
 
 ## 업데이트
+
+### v1.5.0 — 26.06.26
+- `templates/spring-boot/hooks/stop_build_check.sh` — 위험도 높은 파일 변경 시 `/code-review` 권장 경고 추가
+- `templates/vue/hooks/stop_check.sh` 추가 — Vue Stop 훅: 위험 파일 감지 및 코드 리뷰 권장
+- `templates/vue/settings.json` 추가 — Vue Stop 훅 설정
+- `install.sh` — 프로젝트 설치 로직 일반화 (settings.json + hooks/ 존재 시 자동 복사)
 
 ### v1.4.0 — 26.06.19
 - `install.sh` — `--project` 플래그 추가로 프로젝트 설치 지원 (spring-boot / vue)
