@@ -167,6 +167,15 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 
 ## 업데이트
 
+### v1.5.4 — 26.06.26
+- `core/hooks/pre_tool_use_confirm.sh` — `git stash` 확인 필요 패턴 추가
+
+### v1.5.3 — 26.06.26
+- `core/settings.json` — `permissions.allow` 추가: 파일 읽기·git 조회·파일 탐색 등 안전한 작업 자동 허용으로 불필요한 승인 요청 감소
+
+### v1.5.2 — 26.06.26
+- `core/global-CLAUDE.md` — 요구사항 명확화 기준 추가: 질문해야 할 때 vs 자율 진행할 때 기준 명시
+
 ### v1.5.1 — 26.06.26
 - `install.sh` — `--hooks-only` 플래그 추가: CLAUDE.md 제외하고 훅·settings.json만 복사 (기존 프로젝트 업데이트 시 커스텀 내용 보존)
 

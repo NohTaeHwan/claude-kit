@@ -40,6 +40,8 @@ elif echo "$COMMAND" | grep -iEq "git[[:space:]]+rebase"; then
     MATCHED_DESC="git rebase — 히스토리 재작성"
 elif echo "$COMMAND" | grep -iEq "(^|[[:space:]]|--)force([[:space:]]|$)"; then
     MATCHED_DESC="force 옵션 — 강제 실행"
+elif echo "$COMMAND" | grep -iEq "git[[:space:]]+stash"; then
+    MATCHED_DESC="git stash — 미커밋 변경사항 임시 저장 (잘못 처리 시 작업물 유실 위험)"
 fi
 
 # ── 패턴 매칭 시 차단 (메시지는 stderr로 출력 — 하네스가 stderr를 Claude에게 전달) ──
