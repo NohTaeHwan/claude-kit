@@ -67,6 +67,10 @@ git pull         # 훅·CLAUDE.md는 심볼릭 링크로 자동 반영
 
 # Vue 프로젝트
 ./install.sh --project /path/to/your-project vue
+
+# 훅·설정만 업데이트 (CLAUDE.md 커스텀 내용 유지)
+./install.sh --project /path/to/your-project vue --hooks-only
+./install.sh --project /path/to/your-project spring-boot --hooks-only
 ```
 
 설치되는 파일:
@@ -162,6 +166,9 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 ---
 
 ## 업데이트
+
+### v1.5.1 — 26.06.26
+- `install.sh` — `--hooks-only` 플래그 추가: CLAUDE.md 제외하고 훅·settings.json만 복사 (기존 프로젝트 업데이트 시 커스텀 내용 보존)
 
 ### v1.5.0 — 26.06.26
 - `templates/spring-boot/hooks/stop_build_check.sh` — 위험도 높은 파일 변경 시 `/code-review` 권장 경고 추가

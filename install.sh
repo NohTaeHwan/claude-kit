@@ -4,6 +4,7 @@
 # 전역 설치:     ./install.sh
 # 프로젝트 설치: ./install.sh --project /path/to/project spring-boot
 #               ./install.sh --project /path/to/project vue
+#               ./install.sh --project /path/to/project vue --hooks-only   ← CLAUDE.md 제외, 훅·설정만 복사
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -23,8 +24,11 @@ if [ "$1" = "--project" ]; then
     PROJECT_DIR="$2"
     TEMPLATE="$3"
 
+    HOOKS_ONLY=0
+    [ "$4" = "--hooks-only" ] && HOOKS_ONLY=1
+
     if [ -z "$PROJECT_DIR" ] || [ -z "$TEMPLATE" ]; then
-        echo "사용법: ./install.sh --project /path/to/project [spring-boot|vue]"
+        echo "사용법: ./install.sh --project /path/to/project [spring-boot|vue] [--hooks-only]"
         exit 1
     fi
 
@@ -43,10 +47,14 @@ if [ "$1" = "--project" ]; then
     echo "[$TEMPLATE] 프로젝트 설치 시작: $PROJECT_DIR"
     echo ""
 
-    # CLAUDE.md 복사
-    backup_if_exists "$PROJECT_DIR/CLAUDE.md"
-    cp "$TEMPLATE_DIR/CLAUDE.md" "$PROJECT_DIR/CLAUDE.md"
-    echo "[완료] CLAUDE.md → $PROJECT_DIR/CLAUDE.md"
+    # CLAUDE.md 복사 (--hooks-only 시 건너뜀)
+    if [ $HOOKS_ONLY -eq 0 ]; then
+        backup_if_exists "$PROJECT_DIR/CLAUDE.md"
+        cp "$TEMPLATE_DIR/CLAUDE.md" "$PROJECT_DIR/CLAUDE.md"
+        echo "[완료] CLAUDE.md → $PROJECT_DIR/CLAUDE.md"
+    else
+        echo "[건너뜀] CLAUDE.md (--hooks-only 모드)"
+    fi
 
     # settings.json + hooks/ 복사 (템플릿에 있는 경우 자동 복사)
     if [ -f "$TEMPLATE_DIR/settings.json" ]; then
@@ -70,7 +78,9 @@ if [ "$1" = "--project" ]; then
 
     echo ""
     echo "[$TEMPLATE] 프로젝트 설치 완료!"
-    echo "CLAUDE.md를 열어 프로젝트에 맞게 내용을 채워주세요."
+    if [ $HOOKS_ONLY -eq 0 ]; then
+        echo "CLAUDE.md를 열어 프로젝트에 맞게 내용을 채워주세요."
+    fi
 
 else
 
