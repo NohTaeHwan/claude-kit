@@ -15,6 +15,14 @@ HOOK_ACTIVE=$(echo "$INPUT" | python3 -c \
     2>/dev/null || echo "False")
 [ "$HOOK_ACTIVE" = "True" ] && exit 0
 
+# ── 코드 변경 여부 확인 — 변경 없으면 컴파일·테스트 건너뜀 ──────────────────
+CODE_CHANGED=$(
+    { git diff --name-only HEAD 2>/dev/null
+      git ls-files --others --exclude-standard 2>/dev/null; } | \
+    grep -E "^src/.*\.(java|kt|groovy)$|^build\.gradle$|^pom\.xml$|^settings\.gradle$" | head -1
+)
+[ -z "$CODE_CHANGED" ] && exit 0
+
 # ── 빌드 도구 감지 ───────────────────────────────────────────────────────────
 if [ -f "./gradlew" ]; then
     COMPILE_CMD="./gradlew compileJava compileTestJava"
