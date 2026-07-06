@@ -61,6 +61,8 @@ if [ "$1" = "--project" ]; then
         mkdir -p "$PROJECT_DIR/.claude/hooks"
         backup_if_exists "$PROJECT_DIR/.claude/settings.json"
         cp "$TEMPLATE_DIR/settings.json" "$PROJECT_DIR/.claude/settings.json"
+        # 훅 명령어를 절대경로로 치환 (CWD 무관하게 스크립트를 찾기 위해)
+        sed -i '' "s|bash .claude/hooks/|bash $PROJECT_DIR/.claude/hooks/|g" "$PROJECT_DIR/.claude/settings.json"
         echo "[완료] settings.json → $PROJECT_DIR/.claude/settings.json"
     fi
 
