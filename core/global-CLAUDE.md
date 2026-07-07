@@ -68,6 +68,7 @@
 - `git rebase` — 히스토리 재작성
 - `--force` 또는 `force` 옵션 포함 명령어 — 강제 실행
 - `git stash` — 미커밋 변경사항 임시 저장 (잘못 처리 시 작업물 유실 위험)
+- `rm` — 파일 삭제
 
 **Edit / Write 도구** — PreToolUse 훅(`pre_tool_use_file_guard.sh`)이 아래 민감 파일을 자동 차단함
 

@@ -18,9 +18,10 @@ claude-kit/
 └── templates/
     ├── spring-boot/
     │   ├── CLAUDE.md              ← 프로젝트 CLAUDE.md 시작점
-    │   ├── settings.json          ← 프로젝트 .claude/settings.json (Stop 훅 설정)
+    │   ├── settings.json          ← 프로젝트 .claude/settings.json (Stop·PreToolUse 훅 설정)
     │   └── hooks/
-    │       └── stop_build_check.sh    ← Stop 훅: 컴파일·테스트 자동 검증 + 위험 파일 경고
+    │       ├── stop_build_check.sh            ← Stop 훅: 컴파일·테스트 자동 검증 + 위험 파일 경고
+    │       └── pre_tool_use_mark_code_change.sh ← PreToolUse 훅: 코드 변경 마커 생성
     └── vue/
         ├── CLAUDE.md              ← Vue 3 프로젝트 CLAUDE.md 시작점
         ├── settings.json          ← 프로젝트 .claude/settings.json (Stop 훅 설정)
@@ -166,6 +167,18 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 ---
 
 ## 업데이트
+
+### v1.6.0 — 26.07.07
+- `templates/spring-boot/hooks/pre_tool_use_mark_code_change.sh` 추가 — Claude가 Edit/Write로 `.java`/`.kt`/빌드 파일 수정 시 마커(`.claude/.code_changed`) 생성
+- `templates/spring-boot/settings.json` — PreToolUse 훅 추가 (matcher: Edit, Write로 명시)
+- `templates/spring-boot/hooks/stop_build_check.sh` 전면 개편
+  - 기존: 매 응답마다 전체 `./gradlew test` 실행 → 토론 중에도 테스트 남발
+  - 변경: 이번 턴에 Claude가 수정한 파일이 있을 때만 실행, 수정 파일에 대응하는 테스트 클래스만 타겟 실행
+  - 탐색 결과 투명 출력 — 대응 테스트 없을 때 탐색 경로 표시 (`→ 탐색: ... (없음)`)
+  - 테스트 통과 시 `✅` 성공 메시지 출력
+- `install.sh` — settings.json 설치 시 훅 명령어를 절대경로로 자동 치환 (CWD 무관하게 스크립트 탐색)
+- 스크립트 내부 PROJECT_ROOT 도출 방식 변경 — `git rev-parse` 대신 `SCRIPT_DIR` 기반으로 안정화
+- `core/settings.json` — deny list에 `rm -f` 추가
 
 ### v1.5.4 — 26.06.26
 - `core/hooks/pre_tool_use_confirm.sh` — `git stash` 확인 필요 패턴 추가
