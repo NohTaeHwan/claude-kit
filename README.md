@@ -19,9 +19,12 @@ claude-kit/
     ├── spring-boot/
     │   ├── CLAUDE.md              ← 프로젝트 CLAUDE.md 시작점
     │   ├── settings.json          ← 프로젝트 .claude/settings.json (Stop·PreToolUse 훅 설정)
-    │   └── hooks/
-    │       ├── stop_build_check.sh            ← Stop 훅: 컴파일·테스트 자동 검증 + 위험 파일 경고
-    │       └── pre_tool_use_mark_code_change.sh ← PreToolUse 훅: 코드 변경 마커 생성
+    │   ├── hooks/
+    │   │   ├── stop_build_check.sh            ← Stop 훅: 컴파일·테스트 검증 + 코드 검수 분석
+    │   │   └── pre_tool_use_mark_code_change.sh ← PreToolUse 훅: 코드 변경 마커 생성
+    │   └── review/
+    │       ├── review_guide.py    ← 검수 분석 스크립트 (diff → finding → JSON 출력)
+    │       └── review-rules.json  ← 검수 규칙 15개 (Critical·High·Medium)
     └── vue/
         ├── CLAUDE.md              ← Vue 3 프로젝트 CLAUDE.md 시작점
         ├── settings.json          ← 프로젝트 .claude/settings.json (Stop 훅 설정)
@@ -78,7 +81,7 @@ git pull         # 훅·CLAUDE.md는 심볼릭 링크로 자동 반영
 
 | 템플릿 | 파일 |
 |---|---|
-| spring-boot | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/stop_build_check.sh` |
+| spring-boot | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/stop_build_check.sh`, `.claude/hooks/pre_tool_use_mark_code_change.sh`, `.claude/review/review_guide.py`, `.claude/review/review-rules.json` |
 | vue | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/stop_check.sh` |
 
 설치 후 `CLAUDE.md`를 열어 프로젝트에 맞게 내용을 채운다.
@@ -167,6 +170,13 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 ---
 
 ## 업데이트
+
+### v1.7.0 — 26.08.05
+- `templates/spring-boot/review/review_guide.py` 추가 — diff 분석 스크립트. contentPatterns 기반 finding 생성, reviewRequired 판정, JSON 출력
+- `templates/spring-boot/review/review-rules.json` 추가 — 15개 MVP 검수 규칙 (Critical 5 / High 7 / Medium 3)
+- `templates/spring-boot/hooks/stop_build_check.sh` 개편 — 컴파일·테스트 완료 후 review_guide.py 실행. reviewRequired=true 시 리포트 지시문 출력 후 exit 2. 기존 "위험 파일 경고" 섹션 제거 (규칙 파일로 대체)
+- `install.sh` — review/ 디렉토리 복사 로직 추가
+- `tests/test_review_guide.py` 추가 — 9개 단위 테스트
 
 ### v1.6.0 — 26.07.07
 - `templates/spring-boot/hooks/pre_tool_use_mark_code_change.sh` 추가 — Claude가 Edit/Write로 `.java`/`.kt`/빌드 파일 수정 시 마커(`.claude/.code_changed`) 생성

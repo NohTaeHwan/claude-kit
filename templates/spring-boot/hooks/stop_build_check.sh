@@ -1,13 +1,16 @@
 #!/bin/bash
-# Stop 훅: 작업 완료 전 컴파일·테스트 자동 검증
+# Stop 훅: 작업 완료 전 컴파일·테스트 자동 검증 및 코드 검수 분석
 #
 # 동작 방식:
 #   1. 이번 턴에 Claude가 수정한 파일 목록을 마커 파일에서 읽음
 #   2. 마커 없으면 즉시 통과 (코드 수정 없는 턴)
 #   3. 컴파일 실패 시 exit 2로 차단
-#   4. 수정된 파일에 대응하는 테스트 클래스만 실행 (전체 테스트 X)
+#   4. 수정된 파일에 대응하는 테스트 클래스 실행 (없으면 상태 기록 후 검수로 계속)
 #   5. 테스트 실패 시 exit 2로 차단
-#   6. stop_hook_active = true이면 재시작된 세션이므로 즉시 통과 (무한 루프 방지)
+#   6. review_guide.py로 코드 검수 분석 실행
+#   7. reviewRequired=true이면 분석 결과·지시를 Claude에게 전달 후 exit 2
+#   8. reviewRequired=false이면 exit 0
+#   9. stop_hook_active=true이면 재시작된 세션이므로 즉시 통과 (무한 루프 방지)
 
 INPUT=$(cat)
 
@@ -56,6 +59,8 @@ if [ $COMPILE_EXIT -ne 0 ]; then
     exit 2
 fi
 
+COMPILE_RESULT="passed"
+
 # ── 테스트 대상 결정 (수정 파일 → 대응 테스트 클래스) ──────────────────────────
 TEST_CLASSES=""
 NOT_FOUND_LOG=""
@@ -88,70 +93,105 @@ while IFS= read -r abs_file; do
     fi
 done <<< "$MODIFIED_FILES"
 
-# 대응 테스트가 없으면 탐색 결과 보여주고 건너뜀
-if [ -z "$TEST_CLASSES" ]; then
+# ── 테스트 실행 ──────────────────────────────────────────────────────────────
+TEST_STATUS="not-found"
+EXECUTED_TESTS=""
+
+if [ -n "$TEST_CLASSES" ]; then
     echo "" >&2
-    echo "ℹ️  [stop-build-check] 컴파일 통과. 테스트를 건너뜁니다." >&2
+    echo "🔍 [stop-build-check] 대응 테스트 실행 중..." >&2
+    echo "$TEST_CLASSES" | tr ' ' '\n' | grep -v '^$' | sed 's/^/    /' >&2
+    echo "" >&2
+
+    if [ "$BUILD_TOOL" = "gradle" ]; then
+        TEST_ARGS=$(echo "$TEST_CLASSES" | xargs -n1 echo "--tests" | tr '\n' ' ')
+        TEST_CMD="./gradlew test $TEST_ARGS"
+    else
+        MAVEN_TESTS=$(echo "$TEST_CLASSES" | tr ' ' ',' | sed 's/^,//')
+        TEST_CMD="./mvnw test -Dtest=$MAVEN_TESTS"
+    fi
+
+    TEST_OUTPUT=$($TEST_CMD 2>&1)
+    TEST_EXIT=$?
+
+    if [ $TEST_EXIT -ne 0 ]; then
+        echo "" >&2
+        echo "❌ [stop-build-check] 테스트 실패 — 작업 완료가 차단되었습니다." >&2
+        echo "" >&2
+        echo "$TEST_OUTPUT" | grep -E "FAILED|> Task|tests were|Exception" | head -30 >&2
+        echo "" >&2
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+        echo "▶  실패한 테스트를 수정한 뒤 다시 완료하세요." >&2
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+        exit 2
+    fi
+
+    echo "" >&2
+    echo "✅ [stop-build-check] 테스트 통과" >&2
+    echo "" >&2
+    echo "$TEST_CLASSES" | tr ' ' '\n' | grep -v '^$' | sed 's/^/    /' >&2
+    echo "" >&2
+
+    TEST_STATUS="passed"
+    EXECUTED_TESTS=$(echo "$TEST_CLASSES" | tr ' ' ',' | sed 's/^,//')
+else
+    echo "" >&2
+    echo "ℹ️  [stop-build-check] 컴파일 통과. 대응 테스트 파일 없음." >&2
     echo "" >&2
     printf "%b\n" "$NOT_FOUND_LOG" >&2
     echo "" >&2
+fi
+
+# ── 코드 검수 분석 ────────────────────────────────────────────────────────────
+REVIEW_SCRIPT="$PROJECT_ROOT/.claude/review/review_guide.py"
+RULES_FILE="$PROJECT_ROOT/.claude/review/review-rules.json"
+
+if [ ! -f "$REVIEW_SCRIPT" ] || [ ! -f "$RULES_FILE" ]; then
     exit 0
 fi
 
-echo "" >&2
-echo "🔍 [stop-build-check] 대응 테스트 실행 중..." >&2
-echo "$TEST_CLASSES" | tr ' ' '\n' | grep -v '^$' | sed 's/^/    /' >&2
-echo "" >&2
+REVIEW_OUTPUT=$(python3 "$REVIEW_SCRIPT" \
+    --project-root "$PROJECT_ROOT" \
+    --changed-files "$MODIFIED_FILES" \
+    --compile-result "$COMPILE_RESULT" \
+    --test-result "$TEST_STATUS" \
+    --executed-tests "$EXECUTED_TESTS" \
+    --rules-file "$RULES_FILE" 2>&1)
 
-# ── 테스트 실행 (대응 클래스만 타겟) ─────────────────────────────────────────
-if [ "$BUILD_TOOL" = "gradle" ]; then
-    TEST_ARGS=$(echo "$TEST_CLASSES" | xargs -n1 echo "--tests" | tr '\n' ' ')
-    TEST_CMD="./gradlew test $TEST_ARGS"
-else
-    MAVEN_TESTS=$(echo "$TEST_CLASSES" | tr ' ' ',' | sed 's/^,//')
-    TEST_CMD="./mvnw test -Dtest=$MAVEN_TESTS"
-fi
+REVIEW_EXIT=$?
 
-TEST_OUTPUT=$($TEST_CMD 2>&1)
-TEST_EXIT=$?
-
-if [ $TEST_EXIT -ne 0 ]; then
+if [ $REVIEW_EXIT -ne 0 ]; then
     echo "" >&2
-    echo "❌ [stop-build-check] 테스트 실패 — 작업 완료가 차단되었습니다." >&2
+    echo "⚠️  [stop-build-check] 검수 분석 실패 — 수동 검수가 필요합니다." >&2
     echo "" >&2
-    echo "$TEST_OUTPUT" | grep -E "FAILED|> Task|tests were|Exception" | head -30 >&2
+    echo "$REVIEW_OUTPUT" | head -20 | sed 's/^/    /' >&2
     echo "" >&2
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-    echo "▶  실패한 테스트를 수정한 뒤 다시 완료하세요." >&2
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "코드를 추가로 수정하지 마세요." >&2
+    echo "검수 분석 스크립트 실행에 실패했습니다. 사용자에게 수동 검수가 필요하다는 사실과 위 실패 원인을 알려주세요." >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
     exit 2
 fi
 
-echo "" >&2
-echo "✅ [stop-build-check] 테스트 통과" >&2
-echo "" >&2
-echo "$TEST_CLASSES" | tr ' ' '\n' | grep -v '^$' | sed 's/^/    /' >&2
-echo "" >&2
+REVIEW_REQUIRED=$(echo "$REVIEW_OUTPUT" | python3 -c \
+    "import sys,json; d=json.load(sys.stdin); print(d.get('reviewRequired', False))" \
+    2>/dev/null || echo "False")
 
-# ── 위험 파일 변경 감지 (코드 리뷰 권장) ─────────────────────────────────────
-CHANGED_FILES=$(
-    { git diff --name-only HEAD 2>/dev/null
-      git ls-files --others --exclude-standard 2>/dev/null; } | sort -u
-)
-
-if [ -n "$CHANGED_FILES" ]; then
-    RISKY_FILES=$(echo "$CHANGED_FILES" | grep -iE \
-        "migration/|/security/|Security[A-Za-z]+\.(java|kt)|/auth/|Auth[A-Za-z]+\.(java|kt)|/payment/|Payment[A-Za-z]+\.(java|kt)|\.github/workflows/")
-    if [ -n "$RISKY_FILES" ]; then
-        echo "" >&2
-        echo "⚠️  [stop-build-check] 위험도 높은 파일이 변경되었습니다 — /code-review 실행을 권장합니다." >&2
-        echo "" >&2
-        echo "$RISKY_FILES" | sed 's/^/    /' >&2
-        echo "" >&2
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-        echo "▶  /code-review 를 실행하고 리뷰 완료 후 완료 처리하세요." >&2
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-    fi
+if [ "$REVIEW_REQUIRED" = "True" ]; then
+    echo "" >&2
+    echo "📋 [stop-build-check] 코드 검수 리포트 작성 필요" >&2
+    echo "" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "코드를 추가로 수정하지 마세요." >&2
+    echo "아래 검수 분석 결과를 바탕으로 사용자에게 코드 검수 리포트만 출력하세요." >&2
+    echo "검수 포인트는 최대 3~7개이며 위치·이유·확인 내용을 포함하세요." >&2
+    echo "분석 결과에 없는 파일·라인·테스트 결과를 만들지 마세요." >&2
+    echo "이상징후를 확정 오류로 단정하지 마세요." >&2
+    echo "후속 수정 여부는 사용자가 결정합니다." >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "" >&2
+    echo "$REVIEW_OUTPUT" >&2
+    exit 2
 fi
 
 exit 0

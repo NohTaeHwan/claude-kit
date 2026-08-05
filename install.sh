@@ -78,6 +78,18 @@ if [ "$1" = "--project" ]; then
         done
     fi
 
+    # review/ 디렉토리 복사 (템플릿에 있는 경우)
+    if [ -d "$TEMPLATE_DIR/review" ]; then
+        mkdir -p "$PROJECT_DIR/.claude/review"
+        for review_file in "$TEMPLATE_DIR/review/"*; do
+            [ -f "$review_file" ] || continue
+            review_name=$(basename "$review_file")
+            backup_if_exists "$PROJECT_DIR/.claude/review/$review_name"
+            cp "$review_file" "$PROJECT_DIR/.claude/review/$review_name"
+            echo "[완료] $review_name → $PROJECT_DIR/.claude/review/"
+        done
+    fi
+
     echo ""
     echo "[$TEMPLATE] 프로젝트 설치 완료!"
     if [ $HOOKS_ONLY -eq 0 ]; then
