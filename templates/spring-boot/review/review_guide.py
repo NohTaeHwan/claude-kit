@@ -179,12 +179,10 @@ def apply_rule(rule, file_path, diff_text):
 
 def _is_review_required(high_risk_findings, test_result):
     """
-    reportRequired=true 규칙 탐지 또는 테스트 미실행 시 reviewRequired=true.
-    Medium 전용 finding은 reviewRequired에 영향을 주지 않습니다.
+    reportRequired=true 규칙(Critical·High)이 탐지됐을 때만 reviewRequired=true.
+    "테스트 없음" 단독은 리포트를 트리거하지 않음 — validation.unverified에 기록만 함.
     """
     if high_risk_findings:
-        return True
-    if test_result in ('not-found', 'not-run'):
         return True
     return False
 

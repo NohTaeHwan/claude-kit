@@ -177,6 +177,10 @@ REVIEW_REQUIRED=$(echo "$REVIEW_OUTPUT" | python3 -c \
     "import sys,json; d=json.load(sys.stdin); print(d.get('reviewRequired', False))" \
     2>/dev/null || echo "False")
 
+HIGHEST_RISK=$(echo "$REVIEW_OUTPUT" | python3 -c \
+    "import sys,json; d=json.load(sys.stdin); print(d.get('highestRisk', 'none'))" \
+    2>/dev/null || echo "none")
+
 if [ "$REVIEW_REQUIRED" = "True" ]; then
     echo "" >&2
     echo "📋 [stop-build-check] 코드 검수 리포트 작성 필요" >&2
@@ -188,10 +192,25 @@ if [ "$REVIEW_REQUIRED" = "True" ]; then
     echo "분석 결과에 없는 파일·라인·테스트 결과를 만들지 마세요." >&2
     echo "이상징후를 확정 오류로 단정하지 마세요." >&2
     echo "후속 수정 여부는 사용자가 결정합니다." >&2
+    if [ "$HIGHEST_RISK" = "critical" ] || [ "$HIGHEST_RISK" = "high" ]; then
+        echo "리포트 마지막에 '/code-review 실행을 권장합니다' 한 줄을 추가하세요." >&2
+    fi
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
     echo "" >&2
     echo "$REVIEW_OUTPUT" >&2
     exit 2
 fi
+
+# reviewRequired=false: 간략 위험도 표시
+case "$HIGHEST_RISK" in
+    critical|high) RISK_ICON="🔴" ;;
+    medium)        RISK_ICON="🟡" ;;
+    *)             RISK_ICON="🟢" ;;
+esac
+EXTRA=""
+[ "$TEST_STATUS" = "not-found" ] && EXTRA=" | 대응 테스트 없음"
+echo "" >&2
+echo "${RISK_ICON} [stop-build-check] 검수 완료 — 위험도: ${HIGHEST_RISK}${EXTRA}" >&2
+echo "" >&2
 
 exit 0

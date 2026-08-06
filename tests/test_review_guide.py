@@ -90,7 +90,7 @@ class TestReviewGuide(unittest.TestCase):
         self.assertIsNotNone(txn[0].get('line'), "finding에 line이 있어야 합니다")
         self.assertIsNotNone(txn[0].get('file'), "finding에 file이 있어야 합니다")
 
-    # ── TC-4: 대응 테스트 없음 → reviewRequired=true, unverified 포함 ─────────
+    # ── TC-4: 대응 테스트 없음 단독 → reviewRequired=false, unverified에만 기록 ──
     def test_tc4_no_test_found(self):
         diff = (
             "--- a/src/main/java/com/example/ArticleService.java\n"
@@ -107,8 +107,8 @@ class TestReviewGuide(unittest.TestCase):
             diff_by_file,
             'passed', 'not-found', [],
         )
-        self.assertTrue(result['reviewRequired'],
-                        "대응 테스트 없음은 reviewRequired=true여야 합니다")
+        self.assertFalse(result['reviewRequired'],
+                         "위험 규칙 없이 테스트 없음 단독은 reviewRequired=false여야 합니다")
         self.assertIn('대응 테스트 없음', result['validation']['unverified'])
 
     # ── TC-5: 빈 catch 블록 → ruleId·check 포함 ──────────────────────────────
