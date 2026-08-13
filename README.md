@@ -209,8 +209,7 @@ Critical·High 규칙 탐지 → 리포트 생성. 대응 테스트 없음은 �
 ## 업데이트
 
 ### v1.7.2 — 26.08.13
-- `review_guide.py` finding에 규칙 기반 탐지를 나타내는 `source: hook-rule` 추가
-- Stop Hook의 리포트 출력 계약을 `Hook 자동 탐지 결과`와 `Agent 추가 검토 의견`으로 분리
+- Stop Hook의 리포트 내용을 `Hook 자동 탐지 결과`와 `Agent 추가 검토 의견`으로 분리
 - Agent 의견은 Hook 탐지가 아님을 명시하고, 의견이 없을 때는 `추가 의견 없음`으로 출력
 
 ### v1.7.1 — 26.08.13
