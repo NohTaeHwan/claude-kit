@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -191,14 +192,74 @@ class TestStopBuildCheck(unittest.TestCase):
                 capture_output=True, cwd=project_root,
             )
 
-            self.assertEqual(result.returncode, 2, result.stderr)
-            self.assertIn('[Hook 자동 탐지 결과]', result.stderr)
-            self.assertIn('[Agent 추가 검토 의견]', result.stderr)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            feedback = json.loads(result.stdout)
+            hook_output = feedback['hookSpecificOutput']
+            self.assertEqual(hook_output['hookEventName'], 'Stop')
+            additional_context = hook_output['additionalContext']
+            self.assertIn('[Hook 자동 탐지 결과]', additional_context)
+            self.assertIn('[Agent 추가 검토 의견]', additional_context)
             self.assertIn(
                 'Hook 탐지 결과가 아닌 Agent의 추가 의견',
-                result.stderr,
+                additional_context,
             )
-            self.assertIn('추가 의견이 없으면', result.stderr)
+            self.assertIn('추가 의견이 없으면', additional_context)
+            self.assertIn('"reviewRequired": true', additional_context)
+            self.assertNotIn('코드 검수 리포트 작성 필요', result.stderr)
+
+    def test_feedback_json_generation_failure_exits_2(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = Path(tmp)
+            hook_dir = project_root / '.claude' / 'hooks'
+            review_dir = project_root / '.claude' / 'review'
+            bin_dir = project_root / 'bin'
+            hook_dir.mkdir(parents=True)
+            review_dir.mkdir(parents=True)
+            bin_dir.mkdir()
+            hook_path = hook_dir / 'stop_build_check.sh'
+            shutil.copy2(HOOK_SOURCE, hook_path)
+
+            main_file = project_root / 'src/main/java/com/example/UserController.java'
+            main_file.parent.mkdir(parents=True)
+            main_file.write_text('class UserController {}\n', encoding='utf-8')
+            (project_root / '.claude' / '.code_changed').write_text(
+                f'{main_file}\n', encoding='utf-8',
+            )
+
+            gradlew = project_root / 'gradlew'
+            gradlew.write_text('#!/bin/bash\nexit 0\n', encoding='utf-8')
+            gradlew.chmod(0o755)
+            (review_dir / 'review_guide.py').write_text(
+                'import json\n'
+                'print(json.dumps({"reviewRequired": True, '
+                '"highestRisk": "high", "findings": [], '
+                '"validation": {}}))\n',
+                encoding='utf-8',
+            )
+            (review_dir / 'review-rules.json').write_text('[]\n', encoding='utf-8')
+
+            python_wrapper = bin_dir / 'python3'
+            python_wrapper.write_text(
+                '#!/bin/bash\n'
+                'case "$*" in\n'
+                '  *hookSpecificOutput*) exit 73 ;;\n'
+                'esac\n'
+                'exec "$REAL_PYTHON" "$@"\n',
+                encoding='utf-8',
+            )
+            python_wrapper.chmod(0o755)
+            env = os.environ.copy()
+            env['PATH'] = f'{bin_dir}{os.pathsep}{env["PATH"]}'
+            env['REAL_PYTHON'] = sys.executable
+
+            result = subprocess.run(
+                [str(hook_path)], input=json.dumps({}), text=True,
+                capture_output=True, env=env, cwd=project_root,
+            )
+
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertEqual(result.stdout, '')
+            self.assertIn('feedback JSON 생성 실패', result.stderr)
 
 
 if __name__ == '__main__':

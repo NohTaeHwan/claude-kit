@@ -8,7 +8,7 @@
 #   4. 수정된 파일에 대응하는 테스트 클래스 실행 (없으면 상태 기록 후 검수로 계속)
 #   5. 테스트 실패 시 exit 2로 차단
 #   6. review_guide.py로 코드 검수 분석 실행
-#   7. reviewRequired=true이면 분석 결과·지시를 Claude에게 전달 후 exit 2
+#   7. reviewRequired=true이면 분석 결과·지시를 Stop hook feedback으로 전달 후 exit 0
 #   8. reviewRequired=false이면 exit 0
 #   9. stop_hook_active=true이면 재시작된 세션이므로 즉시 통과 (무한 루프 방지)
 
@@ -207,27 +207,38 @@ HIGHEST_RISK=$(echo "$REVIEW_OUTPUT" | python3 -c \
     2>/dev/null || echo "none")
 
 if [ "$REVIEW_REQUIRED" = "True" ]; then
-    echo "" >&2
-    echo "📋 [stop-build-check] 코드 검수 리포트 작성 필요" >&2
-    echo "" >&2
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-    echo "코드를 추가로 수정하지 마세요." >&2
-    echo "아래 검수 분석 결과를 바탕으로 사용자에게 코드 검수 리포트만 출력하세요." >&2
-    echo "리포트는 반드시 [Hook 자동 탐지 결과]와 [Agent 추가 검토 의견]으로 구분하세요." >&2
-    echo "[Hook 자동 탐지 결과]에는 JSON findings와 validation에 있는 내용만 옮기세요." >&2
-    echo "Hook 결과의 파일·라인·심볼·테스트 결과를 만들거나 변경하지 마세요." >&2
-    echo "[Agent 추가 검토 의견]은 선택 사항이며, 각 항목에 'Hook 탐지 결과가 아닌 Agent의 추가 의견'이라고 명시하세요." >&2
-    echo "추가 의견이 없으면 [Agent 추가 검토 의견] 아래에 '추가 의견 없음'이라고 출력하세요." >&2
-    echo "전체 검수 포인트는 최대 3~7개이며 위치·이유·확인 내용을 포함하세요." >&2
-    echo "이상징후를 확정 오류로 단정하지 마세요." >&2
-    echo "후속 수정 여부는 사용자가 결정합니다." >&2
+    REVIEW_CONTEXT=$(cat <<'EOF'
+코드를 추가로 수정하지 마세요.
+아래 검수 분석 결과를 바탕으로 사용자에게 코드 검수 리포트만 출력하세요.
+리포트는 반드시 [Hook 자동 탐지 결과]와 [Agent 추가 검토 의견]으로 구분하세요.
+[Hook 자동 탐지 결과]에는 JSON findings와 validation에 있는 내용만 옮기세요.
+Hook 결과의 파일·라인·심볼·테스트 결과를 만들거나 변경하지 마세요.
+[Agent 추가 검토 의견]은 선택 사항이며, 각 항목에 'Hook 탐지 결과가 아닌 Agent의 추가 의견'이라고 명시하세요.
+추가 의견이 없으면 [Agent 추가 검토 의견] 아래에 '추가 의견 없음'이라고 출력하세요.
+전체 검수 포인트는 최대 3~7개이며 위치·이유·확인 내용을 포함하세요.
+이상징후를 확정 오류로 단정하지 마세요.
+후속 수정 여부는 사용자가 결정합니다.
+EOF
+)
     if [ "$HIGHEST_RISK" = "critical" ] || [ "$HIGHEST_RISK" = "high" ]; then
-        echo "리포트 마지막에 '/code-review 실행을 권장합니다' 한 줄을 추가하세요." >&2
+        REVIEW_CONTEXT="${REVIEW_CONTEXT}
+리포트 마지막에 '/code-review 실행을 권장합니다' 한 줄을 추가하세요."
     fi
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-    echo "" >&2
-    echo "$REVIEW_OUTPUT" >&2
-    exit 2
+    REVIEW_CONTEXT="${REVIEW_CONTEXT}
+
+검수 분석 결과:
+${REVIEW_OUTPUT}"
+
+    FEEDBACK_JSON=$(printf '%s' "$REVIEW_CONTEXT" | python3 -c \
+        "import json,sys; print(json.dumps({'hookSpecificOutput': {'hookEventName': 'Stop', 'additionalContext': sys.stdin.read()}}, ensure_ascii=False))")
+    FEEDBACK_EXIT=$?
+    if [ $FEEDBACK_EXIT -ne 0 ] || [ -z "$FEEDBACK_JSON" ]; then
+        echo "⚠️  [stop-build-check] feedback JSON 생성 실패 — 수동 검수가 필요합니다." >&2
+        exit 2
+    fi
+
+    printf '%s\n' "$FEEDBACK_JSON"
+    exit 0
 fi
 
 # reviewRequired=false: 간략 위험도 표시
