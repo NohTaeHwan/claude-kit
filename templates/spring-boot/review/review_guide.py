@@ -204,6 +204,19 @@ def _build_unverified(test_result):
     return []
 
 
+def _unique_in_order(items, key=None):
+    """항목의 최초 등장 순서를 유지하며 중복을 제거합니다."""
+    seen = set()
+    unique = []
+    for item in items:
+        identity = key(item) if key else item
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append(item)
+    return unique
+
+
 # ── 핵심 분석 함수 (단위 테스트에서 직접 호출 가능) ───────────────────────────
 
 def analyze(rules, changed_files, diff_by_file, compile_result, test_result, executed_tests):
@@ -219,6 +232,8 @@ def analyze(rules, changed_files, diff_by_file, compile_result, test_result, exe
     Returns:
         dict (JSON-serializable 분석 결과)
     """
+    changed_files = _unique_in_order(changed_files)
+    executed_tests = _unique_in_order(executed_tests)
     reportable_ids = {r['id'] for r in rules if r.get('reportRequired', False)}
 
     findings = []
@@ -228,6 +243,16 @@ def analyze(rules, changed_files, diff_by_file, compile_result, test_result, exe
             continue
         for rule in rules:
             findings.extend(apply_rule(rule, file_path, diff_text))
+
+    findings = _unique_in_order(
+        findings,
+        key=lambda finding: (
+            finding['ruleId'],
+            finding['file'],
+            finding['line'],
+            finding['symbol'],
+        ),
+    )
 
     high_risk = [f for f in findings if f['ruleId'] in reportable_ids]
     review_required = _is_review_required(high_risk, test_result)
@@ -301,7 +326,6 @@ def main():
     # 절대경로 → 프로젝트 루트 기준 상대경로로 변환
     changed_files = []
     for f in args.changed_files.splitlines():
-        f = f.strip()
         if not f:
             continue
         if f.startswith(project_root + '/'):

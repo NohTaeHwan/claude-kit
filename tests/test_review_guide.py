@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """
-review_guide.py 단위 테스트 (9 케이스)
+review_guide.py 단위 테스트
 실행: python3 -m unittest discover -s tests -p 'test_*.py' -v
 """
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 # 테스트 대상 모듈 경로 추가
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'templates', 'spring-boot', 'review'))
-from review_guide import analyze, load_rules, parse_diff_hunks, match_file_patterns
+from review_guide import (
+    analyze,
+    load_rules,
+    match_file_patterns,
+    parse_diff_hunks,
+)
 
 RULES_FILE = os.path.join(
     os.path.dirname(__file__), '..', 'templates', 'spring-boot', 'review', 'review-rules.json'
@@ -194,6 +201,89 @@ class TestReviewGuide(unittest.TestCase):
                     r'^[a-zA-Z_][a-zA-Z0-9_]*$',
                     "symbol이 있다면 유효한 식별자여야 합니다"
                 )
+
+    # ── TC-10: 중복 입력 → 파일·테스트·finding 최초 한 건만 유지 ──────────────
+    def test_tc10_duplicate_inputs_are_deduplicated_in_order(self):
+        file_path = 'src/main/java/com/example/UserController.java'
+        other_file = 'src/main/java/com/example/UserService.java'
+        diff = (
+            "--- a/src/main/java/com/example/UserController.java\n"
+            "+++ b/src/main/java/com/example/UserController.java\n"
+            "@@ -20,6 +20,8 @@\n"
+            " public class UserController {\n"
+            "+    @GetMapping(\"/users\")\n"
+            "+    public List<User> getUsers() {\n"
+        )
+        test_class = 'com.example.UserControllerTest'
+
+        result = analyze(
+            self.rules,
+            [file_path, other_file, file_path],
+            {file_path: diff},
+            'passed', 'passed',
+            [test_class, 'com.example.UserServiceTest', test_class],
+        )
+
+        public_api_findings = [
+            finding for finding in result['findings']
+            if finding['ruleId'] == 'public-api-contract-change'
+        ]
+        self.assertEqual(result['changedFiles'], [file_path, other_file])
+        self.assertEqual(
+            result['validation']['executedTests'],
+            [test_class, 'com.example.UserServiceTest'],
+        )
+        self.assertEqual(len(public_api_findings), 1)
+
+    def test_tc11_duplicate_findings_are_deduplicated_by_identity(self):
+        file_path = 'src/main/java/com/example/UserController.java'
+        diff = (
+            "--- a/src/main/java/com/example/UserController.java\n"
+            "+++ b/src/main/java/com/example/UserController.java\n"
+            "@@ -20,6 +20,8 @@\n"
+            "+    @GetMapping(\"/users\")\n"
+            "+    public List<User> getUsers() {\n"
+        )
+        public_api_rule = next(
+            rule for rule in self.rules
+            if rule['id'] == 'public-api-contract-change'
+        )
+
+        result = analyze(
+            [public_api_rule, public_api_rule.copy()],
+            [file_path],
+            {file_path: diff},
+            'passed', 'passed', [],
+        )
+
+        self.assertEqual(len(result['findings']), 1)
+
+    def test_tc12_cli_preserves_spaces_in_changed_file_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = Path(tmp)
+            relative_path = Path('src/main/java/com/example/ UserController.java ')
+            changed_file = project_root / relative_path
+            changed_file.parent.mkdir(parents=True)
+            changed_file.write_text('class UserController {}\n', encoding='utf-8')
+            script = Path(RULES_FILE).parent / 'review_guide.py'
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    '--project-root', str(project_root),
+                    '--changed-files', str(changed_file),
+                    '--compile-result', 'passed',
+                    '--test-result', 'not-run',
+                    '--rules-file', RULES_FILE,
+                ],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads(result.stdout)
+            self.assertEqual(report['changedFiles'], [str(relative_path)])
 
 
 if __name__ == '__main__':

@@ -58,6 +58,37 @@ if [ -f "$APPROVAL_FILE" ]; then
     APPROVED_PATH=$(cat "$APPROVAL_FILE" 2>/dev/null | tr -d '\n')
     if [ "$APPROVED_PATH" = "$FILE_PATH" ]; then
         rm -f "$APPROVAL_FILE"
+
+        # ── 승인 후 시크릿 패턴 스캔 ────────────────────────────────────
+        # Edit → new_string, Write → content 필드에서 쓰일 내용을 추출
+        NEW_CONTENT=$(echo "$INPUT" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+ti = d.get('tool_input', {})
+print(ti.get('new_string') or ti.get('content') or '')
+" 2>/dev/null || echo "")
+
+        if [ -n "$NEW_CONTENT" ]; then
+            # 환경변수 참조(\${...}) 및 빈 값은 제외하고 실제 값이 있는 경우만 탐지
+            SECRET_MATCHES=$(echo "$NEW_CONTENT" | grep -inE \
+                "(password|passwd|secret|jwt|api.?key|access.?key|token|credential)\s*[:=]\s*['\"]?[^'\"\s\$\{]{4,}" \
+                | grep -ivE "\$\{|\#" \
+                || true)
+
+            if [ -n "$SECRET_MATCHES" ]; then
+                echo "" >&2
+                echo "🚨 [file-guard] 시크릿 패턴이 감지됐습니다 — 실제 값이 포함되어 있는지 확인하세요." >&2
+                echo "" >&2
+                echo "$SECRET_MATCHES" | head -5 | sed 's/^/    /' >&2
+                echo "" >&2
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+                echo "▶  환경변수(\${VAR}) 참조로 대체되어야 하는 값이 아닌지 확인하세요." >&2
+                echo "   문제없다면 수정이 그대로 적용됩니다." >&2
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+                echo "" >&2
+            fi
+        fi
+
         exit 0
     fi
 fi

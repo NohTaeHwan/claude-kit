@@ -184,7 +184,7 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 | High | 트랜잭션 경계, 락·동시성, 비동기·스케줄러, 외부 호출, 공개 API 계약, 빈 catch |
 | Medium | TODO·임시 구현, 타임아웃 없는 외부 호출, 무제한 조회 |
 
-Critical·High 규칙 탐지 또는 대응 테스트 없음 → 리포트 생성. Medium만 있으면 통과.
+Critical·High 규칙 탐지 → 리포트 생성. 대응 테스트 없음은 미검증 항목으로 기록하며, Medium만 있으면 통과.
 
 리포트는 같은 Claude가 출력하며, 별도 에이전트·파일 누적 없음. 후속 수정 여부는 사용자 판단.
 
@@ -202,6 +202,11 @@ Critical·High 규칙 탐지 또는 대응 테스트 없음 → 리포트 생성
 ---
 
 ## 업데이트
+
+### v1.7.1 — 26.08.13
+- `templates/spring-boot/hooks/stop_build_check.sh` — 동일 파일을 여러 번 Edit/Write해도 변경 파일과 대응 테스트 클래스를 최초 등장 순서로 한 번만 처리
+- `templates/spring-boot/review/review_guide.py` — `changedFiles`, `executedTests`, 동일 `ruleId + file + line + symbol` finding 중복 제거
+- 중복 분석 입력·finding·Gradle·Maven 실행 경로와 공백 포함 파일 경로를 검증하는 회귀 테스트 6개 추가
 
 ### v1.7.0 — 26.08.05
 - `templates/spring-boot/review/review_guide.py` 추가 — diff 분석 스크립트. contentPatterns 기반 finding 생성, reviewRequired 판정, JSON 출력

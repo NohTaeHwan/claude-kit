@@ -30,6 +30,17 @@ MARKER_FILE="$PROJECT_ROOT/.claude/.code_changed"
 MODIFIED_FILES=$(cat "$MARKER_FILE")
 rm -f "$MARKER_FILE"
 
+# 동일 파일에 여러 번 Edit/Write가 발생해도 최초 등장 순서로 한 번만 처리
+MODIFIED_FILES=$(printf '%s\n' "$MODIFIED_FILES" | python3 -c '
+import sys
+seen = set()
+for line in sys.stdin:
+    path = line.rstrip("\r\n")
+    if path and path not in seen:
+        seen.add(path)
+        print(path)
+')
+
 cd "$PROJECT_ROOT"
 
 # ── 빌드 도구 감지 ───────────────────────────────────────────────────────────
@@ -93,6 +104,20 @@ while IFS= read -r abs_file; do
     fi
 done <<< "$MODIFIED_FILES"
 
+# 서로 다른 변경 파일이 같은 테스트로 연결되는 경우에도 한 번만 실행
+TEST_CLASSES=$(printf '%s\n' "$TEST_CLASSES" \
+    | tr ' ' '\n' \
+    | python3 -c '
+import sys
+seen = set()
+for line in sys.stdin:
+    test_class = line.rstrip("\r\n")
+    if test_class and test_class not in seen:
+        seen.add(test_class)
+        print(test_class)
+' \
+    | tr '\n' ' ')
+
 # ── 테스트 실행 ──────────────────────────────────────────────────────────────
 TEST_STATUS="not-found"
 EXECUTED_TESTS=""
@@ -107,7 +132,7 @@ if [ -n "$TEST_CLASSES" ]; then
         TEST_ARGS=$(echo "$TEST_CLASSES" | xargs -n1 echo "--tests" | tr '\n' ' ')
         TEST_CMD="./gradlew test $TEST_ARGS"
     else
-        MAVEN_TESTS=$(echo "$TEST_CLASSES" | tr ' ' ',' | sed 's/^,//')
+        MAVEN_TESTS=$(echo "$TEST_CLASSES" | tr ' ' ',' | sed 's/^,//; s/,$//')
         TEST_CMD="./mvnw test -Dtest=$MAVEN_TESTS"
     fi
 
