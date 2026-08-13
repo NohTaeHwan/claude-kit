@@ -162,15 +162,20 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 
 빌드와 테스트가 통과해도 트랜잭션 경계, 권한 검사, 외부 부작용, 금액 계산처럼 **사람이 직접 확인해야 할 지점**은 남습니다. Claude가 이런 영역을 변경했을 때 "어디를 봐야 하는가"를 알려주는 기능입니다.
 
-**동작 방식:** Claude가 Java 코드를 변경하면 Stop 훅이 컴파일·테스트 완료 후 자동으로 diff를 분석합니다. 위험 신호가 발견된 경우에만 같은 Claude가 **검수 포인트 3~7개**를 리포트로 출력합니다.
+**동작 방식:** Claude가 Java 코드를 변경하면 Stop 훅이 컴파일·테스트 완료 후 자동으로 diff를 분석합니다. 위험 신호가 발견된 경우에만 같은 Claude가 **검수 포인트 3~7개**를 리포트로 출력합니다. 규칙 기반 Hook 탐지 결과와 Claude의 추가 검토 의견은 별도 영역으로 구분합니다.
 
 ```
 코드 검수 리포트
 
-검수 포인트 1
+[Hook 자동 탐지 결과]
+
+검수 포인트 1 (source: hook-rule)
 - 위치: UserService.deleteAccount(), line 84
 - 이유: @Transactional 경계 안에서 외부 API 호출
 - 확인: 외부 호출 실패 시 롤백 범위와 보상 처리 확인
+
+[Agent 추가 검토 의견]
+- 추가 의견 없음
 
 자동 검증
 - 컴파일 PASS / UserServiceTest PASS
@@ -202,6 +207,11 @@ Critical·High 규칙 탐지 → 리포트 생성. 대응 테스트 없음은 �
 ---
 
 ## 업데이트
+
+### v1.7.2 — 26.08.13
+- `review_guide.py` finding에 규칙 기반 탐지를 나타내는 `source: hook-rule` 추가
+- Stop Hook의 리포트 출력 계약을 `Hook 자동 탐지 결과`와 `Agent 추가 검토 의견`으로 분리
+- Agent 의견은 Hook 탐지가 아님을 명시하고, 의견이 없을 때는 `추가 의견 없음`으로 출력
 
 ### v1.7.1 — 26.08.13
 - `templates/spring-boot/hooks/stop_build_check.sh` — 동일 파일을 여러 번 Edit/Write해도 변경 파일과 대응 테스트 클래스를 최초 등장 순서로 한 번만 처리

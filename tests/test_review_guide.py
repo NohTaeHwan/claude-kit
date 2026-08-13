@@ -74,6 +74,7 @@ class TestReviewGuide(unittest.TestCase):
                         "permitAll() 추가는 reviewRequired=true여야 합니다")
         auth_findings = [f for f in result['findings'] if f['ruleId'] == 'auth-security-change']
         self.assertTrue(len(auth_findings) > 0)
+        self.assertEqual(auth_findings[0]['source'], 'hook-rule')
 
     # ── TC-3: @Transactional 변경 → 파일·라인 finding 존재 ──────────────────
     def test_tc3_transactional_finding_has_location(self):

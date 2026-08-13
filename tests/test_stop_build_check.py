@@ -11,6 +11,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOK_SOURCE = REPO_ROOT / 'templates' / 'spring-boot' / 'hooks' / 'stop_build_check.sh'
+REVIEW_SOURCE = REPO_ROOT / 'templates' / 'spring-boot' / 'review' / 'review_guide.py'
+RULES_SOURCE = REPO_ROOT / 'templates' / 'spring-boot' / 'review' / 'review-rules.json'
 
 
 class TestStopBuildCheck(unittest.TestCase):
@@ -154,6 +156,49 @@ class TestStopBuildCheck(unittest.TestCase):
                 'test --tests com.example.UserControllerTest '
                 '--tests com.example.UserServiceTest',
             )
+
+    def test_review_prompt_separates_hook_findings_from_agent_opinions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = Path(tmp)
+            hook_dir = project_root / '.claude' / 'hooks'
+            review_dir = project_root / '.claude' / 'review'
+            hook_dir.mkdir(parents=True)
+            review_dir.mkdir(parents=True)
+            hook_path = hook_dir / 'stop_build_check.sh'
+            shutil.copy2(HOOK_SOURCE, hook_path)
+            shutil.copy2(REVIEW_SOURCE, review_dir / 'review_guide.py')
+            shutil.copy2(RULES_SOURCE, review_dir / 'review-rules.json')
+
+            main_file = project_root / 'src/main/java/com/example/UserController.java'
+            test_file = project_root / 'src/test/java/com/example/UserControllerTest.java'
+            main_file.parent.mkdir(parents=True)
+            test_file.parent.mkdir(parents=True)
+            main_file.write_text(
+                '@GetMapping("/users")\npublic class UserController {}\n',
+                encoding='utf-8',
+            )
+            test_file.write_text('class UserControllerTest {}\n', encoding='utf-8')
+            (project_root / '.claude' / '.code_changed').write_text(
+                f'{main_file}\n', encoding='utf-8',
+            )
+
+            gradlew = project_root / 'gradlew'
+            gradlew.write_text('#!/bin/bash\nexit 0\n', encoding='utf-8')
+            gradlew.chmod(0o755)
+
+            result = subprocess.run(
+                [str(hook_path)], input=json.dumps({}), text=True,
+                capture_output=True, cwd=project_root,
+            )
+
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn('[Hook 자동 탐지 결과]', result.stderr)
+            self.assertIn('[Agent 추가 검토 의견]', result.stderr)
+            self.assertIn(
+                'Hook 탐지 결과가 아닌 Agent의 추가 의견',
+                result.stderr,
+            )
+            self.assertIn('추가 의견이 없으면', result.stderr)
 
 
 if __name__ == '__main__':

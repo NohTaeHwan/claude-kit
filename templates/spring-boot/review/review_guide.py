@@ -163,6 +163,7 @@ def apply_rule(rule, file_path, diff_text):
                 symbol = find_symbol_near_line(diff_text, line_no)
                 finding = {
                     'ruleId': rule['id'],
+                    'source': 'hook-rule',
                     'severity': rule['severity'],
                     'file': file_path,
                     'line': line_no,
