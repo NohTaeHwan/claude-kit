@@ -1,11 +1,32 @@
 # claude-kit
 
-어떤 프로젝트에서도 바로 사용할 수 있는 Claude Code 하네스 모음.
-전역 규칙(보호·차단)은 한 번 설정하고, 프로젝트 템플릿은 복사해서 시작한다.
+프로젝트 초기 개발시 가져와서 바로 사용할 수 있도록 만든 Claude Code 개발 하네스입니다. \
+Spring boot 로 개발하고 Claude code 사용자에게 최적화 되어있습니다. \
+이 하네스를 통해 초기 프로젝트 AI Workflow 구축시 도움이 되길 바라는 마음에 만들게 되었습니다.
+후에 나오는 설치방법을 통해 간편하게 설치하시고 사용하시면 됩니다.
+
+
+## 주요 기능
+
+| 기능             | 하는 일                                                                                              |
+|------------------|------------------------------------------------------------------------------------------------------|
+| 위험 동작 차단   | 위험한 명령(bash·git·Query..)을 실행 전에 멈추고 사용자 승인을 요청합니다.                           |
+| 민감 파일 보호   | `application*.yml`, `.env`, Claude 설정·Hook 등의 수정을 차단 후 사용자 승인을 요청합니다.           |
+| Hook 자동 테스트 | 코드 변경 후 Hook이 컴파일·관련 테스트를 실행합니다.                                                 |
+| 코드 검수 가이드 | 개발한 주제(인증·트랜잭션·외부 호출 등)의 위험 등급 별로 사람의 검수가 권장되는 부분을 추천해줍니다. |
+| API 개발 Skill   | API 추가·수정·삭제에 대한 skill 문서의 뼈대를 제공합니다 (현재는 spring 한정)                        |
+| 프로젝트 템플릿  | 프로젝트 별 `CLAUDE.md`, settings, Hook을 제공합니다 (현재는 Spring Boot,Vue 제공)                   |
+
+> API 개발 Skill은 `.claude/skills/` 한 곳에 설치하게됩니다. Claude Code와 OpenCode가 같은 Skill 원본을 읽기 때문에 skill 의 경우 OpenCode 사용이 가능합니다.
+
+바로가기: [설치](#설치) · [전역 vs 프로젝트](#적용-범위-전역-vs-프로젝트) · [승인과 재실행](#승인과-재실행) · [Spring API Skill](#spring-api-개발-skill) · [코드 검수](#코드-검수-가이드-spring-boot) · [주의사항](#주의사항)
 
 ---
 
-## 구조
+## 저장소 구조
+
+<details>
+<summary>디렉터리 구조 보기</summary>
 
 ```
 claude-kit/
@@ -22,9 +43,14 @@ claude-kit/
     │   ├── hooks/
     │   │   ├── stop_build_check.sh            ← Stop 훅: 컴파일·테스트 검증 + 코드 검수 분석
     │   │   └── pre_tool_use_mark_code_change.sh ← PreToolUse 훅: 코드 변경 마커 생성
-    │   └── review/
-    │       ├── review_guide.py    ← 검수 분석 스크립트 (diff → finding → JSON 출력)
-    │       └── review-rules.json  ← 검수 규칙 15개 (Critical·High·Medium)
+    │   ├── review/
+    │   │   ├── review_guide.py    ← 검수 분석 스크립트 (diff → finding → JSON 출력)
+    │   │   └── review-rules.json  ← 검수 규칙 15개 (Critical·High·Medium)
+    │   └── skills/
+    │       ├── spring-api-create/ ← 신규 Spring MVC REST API 추가 Skill
+    │       ├── spring-api-update/ ← 기존 API 변경 Skill
+    │       ├── spring-api-delete/ ← API 제거·폐기 Skill
+    │       └── spring-api-shared/ ← 프로젝트 탐지·TDD·문서·검증 공통 절차
     └── vue/
         ├── CLAUDE.md              ← Vue 3 프로젝트 CLAUDE.md 시작점
         ├── settings.json          ← 프로젝트 .claude/settings.json (Stop 훅 설정)
@@ -32,96 +58,191 @@ claude-kit/
             └── stop_check.sh          ← Stop 훅: 위험 파일 변경 감지 및 코드 리뷰 권장
 ```
 
+</details>
+
 ---
 
-## 사용 방법
+## 설치
 
-> 설치 전 [주의사항](#주의사항)을 먼저 확인하세요.
+> 처음 사용한다면 전역(global) 영역을 먼저 설치하고, 실제 개발 저장소에는 프로젝트 템플릿을 별도로 적용합니다. 설치 전에는 [주의사항](#주의사항)을 확인하도록 합니다.
 
-### 최초 설치
+### 1. 전역 설치
+
+전역 설치는 모든 Claude Code 세션에 공통으로 적용할 위험 명령 차단과 민감 파일 보호를 설정합니다.
 
 ```bash
 git clone git@github.com:NohTaeHwan/claude-kit.git ~/dev/claude-kit
 cd ~/dev/claude-kit
-chmod +x install.sh          # 실행 권한 부여 (최초 1회)
+chmod +x install.sh
 ./install.sh
 ```
 
-`install.sh`가 자동으로 처리하는 것:
-- `~/.claude/hooks/` 에 심볼릭 링크 연결 (훅 스크립트)
-- `~/.claude/CLAUDE.md` 에 심볼릭 링크 연결 (전역 행동 규칙)
-- `~/.claude/settings.json` 생성 (HOME 경로 자동 치환, 기존 UI 설정 보존)
+설치 결과:
 
-### 업데이트
+- `~/.claude/hooks/`에 전역 Hook 심볼릭 링크 연결
+- `~/.claude/CLAUDE.md`에 전역 행동 규칙 심볼릭 링크 연결
+- `~/.claude/settings.json` 생성 및 기존 UI 설정 보존
+
+#### 전역 설정 업데이트
 
 ```bash
-git pull         # 훅·CLAUDE.md는 심볼릭 링크로 자동 반영
-./install.sh     # settings.json이 변경된 경우에만 추가 실행
+cd ~/dev/claude-kit
+git pull
+./install.sh
 ```
 
-> `install.sh`는 `ln -sf`를 사용하므로 중복 실행해도 안전하다.
+Hook과 `CLAUDE.md`는 심볼릭 링크로 연결되므로 저장소를 업데이트(pull)하면 바로 반영됩니다. `settings.json`이 바뀌었거나 저장소 경로를 옮겼다면 `./install.sh`를 다시 실행하면 됩니다.
 
-> ⚠️ **레포 디렉토리를 이동한 경우** 심볼릭 링크가 깨진다. 이동 후 반드시 `./install.sh`를 재실행해야 한다. (스크립트가 깨진 링크를 자동 감지하고 현재 경로로 갱신한다.)
+### 2. 프로젝트 설치
 
-### 새 프로젝트 시작
+프로젝트 설치는 저장소별 개발 규칙(claude.md), 자동 검증 Hook, 코드 검수 규칙과 Spring API Skill을 적용합니다.
 
 ```bash
-# Spring Boot 프로젝트
+# Spring Boot 전체 설치
 ./install.sh --project /path/to/your-project spring-boot
 
-# Vue 프로젝트
+# Vue 전체 설치
 ./install.sh --project /path/to/your-project vue
-
-# 훅·설정만 업데이트 (CLAUDE.md 커스텀 내용 유지)
-./install.sh --project /path/to/your-project vue --hooks-only
-./install.sh --project /path/to/your-project spring-boot --hooks-only
 ```
 
-설치되는 파일:
+#### 설치 모드
 
-| 템플릿 | 파일 |
+| 모드 | 설치 범위 | 사용 시점 |
+|---|---|---|
+| 기본 설치 | `CLAUDE.md`, settings, Hook과 템플릿이 제공하는 review·Skill | 새 프로젝트에 템플릿 전체를 적용할 때 |
+| `--hooks-only` | settings, Hook, review | 기존 `CLAUDE.md`와 Skill을 유지하면서 검증 기능만 업데이트할 때 |
+| `--skills-only` | Spring API Skill | 기존 Context·settings·Hook을 그대로 두고 Skill만 추가하거나 업데이트할 때 |
+
+```bash
+# Hook과 settings만 업데이트
+./install.sh --project /path/to/your-project spring-boot --hooks-only
+./install.sh --project /path/to/your-project vue --hooks-only
+
+# Spring API Skill만 설치
+./install.sh --project /path/to/your-project spring-boot --skills-only
+```
+
+템플릿별 기본 설치 결과:
+
+| 템플릿 | 설치 파일 |
 |---|---|
-| spring-boot | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/stop_build_check.sh`, `.claude/hooks/pre_tool_use_mark_code_change.sh`, `.claude/review/review_guide.py`, `.claude/review/review-rules.json` |
+| spring-boot | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/`, `.claude/review/`, `.claude/skills/spring-api-*` |
 | vue | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/stop_check.sh` |
 
-설치 후 `CLAUDE.md`를 열어 프로젝트에 맞게 내용을 채운다.
-
-> 기존 파일이 있으면 `.bak`으로 백업 후 덮어쓴다.
+기존 파일은 같은 위치에 `.bak`으로 백업한 뒤 교체하면 됩니다. 기본 설치 후에는 `CLAUDE.md`의 placeholder와 프로젝트별 규칙을 실제 저장소에 맞게 수정하시면 맞게 사용하실 수 있습니다.
 
 ---
 
-## 전역 vs 프로젝트 구분
+## 적용 범위: 전역 vs 프로젝트
 
-| | 전역 (`~/.claude/`) | 프로젝트 (`.claude/`) |
+전역(global) 과 프로젝트 단위를 구분하여 각각의 영역에 적합한 규칙을 담았습니다. \
+**전역 설정**은 모든 저장소에서 지켜야 할 공통 규칙입니다. **프로젝트** 설정은 해당 저장소의 구조와 검증 방법을 설명합니다.  
+같은 역할을 두 위치에 중복해서 작성하지 않아야 하는점을 꼭 유의하셔야 합니다.
+
+| 구분 | 전역 (`~/.claude/`) | 프로젝트 (`<project>/.claude/`, `CLAUDE.md`) |
 |---|---|---|
-| **settings.json** | deny list + 훅 config | allow list, 프로젝트 추가 훅 |
-| **hooks/** | SQL/git 차단, 민감 파일 보호 | 빌드·테스트 검증 (프로젝트별) |
-| **CLAUDE.md** | 위험 동작 제한, 승인 컨벤션 | 프로젝트 구조, 개발 규칙 |
+| 적용 범위 | 모든 Claude Code 세션 | 해당 프로젝트 |
+| `CLAUDE.md` | 위험 동작 제한, 승인 방식 | 기술 스택, 구조, 개발 규칙, 문서 이정표 |
+| settings | 전역 deny list와 보호 Hook | 프로젝트별 허용 범위와 추가 Hook |
+| Hook | SQL·Git 위험 명령 차단, 민감 파일 보호 | 코드 변경 감지, 컴파일·테스트, 코드 검수 |
+| Skill | 설치하지 않음 | Spring API 추가·수정·삭제 Workflow |
+| 설치 명령 | `./install.sh` | `./install.sh --project ...` |
 
 ---
 
-## 승인 컨벤션 요약
+## 승인과 재실행
 
-**Bash 차단 시** — 사용자 승인 후 명령어 끝에 `# user-confirmed` 추가
+명령어의 위험도에 따라 `완전 차단`, `차단 후 승인(Bash, 민감 파일)` , `자동 허용` 단계로 나뉩니다. \
+AI 작업 context 중 시스템에 위험할 수 있는 작업을 방지하는 목적입니다.
+
+| 구분 | 예시                                                                                     | 처리 방법                                  |
+|---|------------------------------------------------------------------------------------------|--------------------------------------------|
+| **완전 차단** | `rm -rf`, `git push --force`, `DROP TABLE`, `TRUNCATE TABLE`, ...                        | 재실행 불가                                |
+| **차단 → 승인 후 재시도** | `DELETE FROM`, `ALTER TABLE`, `git rebase`, `application*.yml 수정`, `.env 수정`, ...    | 목적·영향을 설명하고 승인을 받은 뒤 재시도 |
+| **자동 허용** | `git status`, `git log`, `ls`, `./gradlew test`, 일반 소스 파일 수정                     | 승인 없이 즉시 실행                        |
+
+> Bash 명령은 `# user-confirmed` 주석을 붙여 재시도하고, Edit/Write는 일회성 경로 토큰을 생성한 뒤 재시도한다. 승인 범위는 해당 명령·파일 한 건에만 적용된다.
+
+### 위험 Bash 명령 승인 절차
+
+1. Hook이 위험한 Bash 명령을 차단
+2. Claude가 명령과 영향 범위를 설명
+3. 사용자가 해당 명령을 승인
+4. 승인된 명령에만 `# user-confirmed`를 붙여 재실행
 
 ```bash
 git rebase main # user-confirmed
 mysql -e "DELETE FROM tb WHERE id=1" # user-confirmed
 ```
 
-**민감 파일 수정 시** — 사용자 승인 후 일회성 토큰 생성 후 즉시 재시도
+### 민감 파일 수정 승인 절차
+
+1. Hook이 보호 대상 파일의 Edit/Write를 차단
+2. Claude가 수정할 경로와 변경 목적을 설명
+3. 사용자가 그 파일 수정을 승인
+4. 해당 경로로 일회성 토큰을 만든 뒤 수정 재시도
+
+
 
 ```bash
 echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # user-confirmed
+```
+
+#### 보호 대상 파일 (Edit/Write 차단)
+
+| 패턴 | 유형 |
+|---|---|
+| `application*.yml` | Spring Boot 설정 |
+| `.env`, `.env.*` | 환경변수 |
+| `.claude/settings.json` | 하네스 설정 |
+| `.claude/hooks/*.sh` | 훅 스크립트 |
+
+토큰은 경로가 정확히 일치하는 다음 수정 한 번에만 사용됩니다. \
+다른 파일에는 적용되지 않으며, 수정 전에 미리 만들어 두지 않기 때문에 다른 파일 수정에는 재사용되지 않습니다.
+
+---
+
+## API 개발 Skill
+
+API 추가·수정·삭제 요청을 서로 다른 Skill들을 통해 개발합니다. \ 
+Claude가 현재 작업에 필요한 skill 절차를 읽어서 보다 정확한 개발을 하도록 합니다.
+
+| Skill             | 사용 시점                                         | 주요 작업                                                                                          |
+|-------------------|---------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `spring-api-create` | 새로운 endpoint나 API 동작을 추가할 때            | 기존 코드 구조 확인 → 테스트 작성 → API 구현 → 테스트 결과와 API 명세·문서 확인                    |
+| `spring-api-update` | 기존 API의 경로·메서드·요청·응답·동작을 변경할 때 | 기존 동작과 사용처 확인 → 테스트 작성 or 수정 → 코드 수정 → 테스트 결과와 API 명세·문서 확인       |
+| `spring-api-delete` | 기존 endpoint를 제거하거나 폐기할 때              | 사용처와 영향 범위 확인 → 삭제 전 관련 테스트 확인 → 전용 코드·설정 제거 → 관련 API 명세·문서 정리 |
+
+세 Skill은 다음 공통 절차를 가집니다.
+
+```text
+프로젝트·모듈 탐지
+→ Gradle/Maven과 Java/Spring 버전 확인
+→ Controller부터 데이터 접근 계층까지 기존 흐름 체크
+→ JPA/MyBatis/영속성 불필요 분기 처리
+→ 테스트 작성/코드 수정/테스트 결과 확인
+→ 프로젝트에서 관리 중인 API 명세와 관련 문서에 변경 내용 반영
+→ Agent 검증 후 Stop Hook 독립 검증
+```
+
+`.claude/skills/`는 Claude Code와 OpenCode가 함께 읽는 경로입니다. \ 
+Skill만 추가하거나 업데이트할 때는 다음 명령을 사용하면 됩니다.
+
+```bash
+./install.sh --project /path/to/your-project spring-boot --skills-only
 ```
 
 ---
 
 ## 프로젝트 템플릿 커스텀 가이드
 
+전역 영역과 달리 프로젝트 별로 규칙, hook, skill 등을 따로 가지고 있습니다. \
+전역은 설치하지만 프로젝트 단위에서는 이 구조를 그대로 복사하여 자신의 프로젝트에 붙여넣어 주는 방식으로 사용합니다. \
+Claude.md 안에는 뼈대만 있으니 프로젝트의 입맛에 맞게 수정해주시면 됩니다.
+
 ### Spring Boot
 
-`templates/spring-boot/CLAUDE.md`를 복사한 뒤 아래 항목을 프로젝트에 맞게 채운다.
+`templates/spring-boot/CLAUDE.md`를 복사한 뒤 아래 항목을 프로젝트에 맞게 채우면 됩니다.
 
 | 항목 | 설명 |
 |---|---|
@@ -134,7 +255,7 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 
 ### Vue
 
-`templates/vue/CLAUDE.md`를 복사한 뒤 아래 항목을 프로젝트에 맞게 채운다.
+`templates/vue/CLAUDE.md`를 복사한 뒤 아래 항목을 프로젝트에 맞게 채운면 됩니다.
 
 | 항목 | 설명 |
 |---|---|
@@ -145,24 +266,21 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 
 ---
 
-## 주의사항
+## 코드 검수 가이드
 
-> ⚠️ **`python3`가 설치되어 있어야 한다.**
-> `install.sh` 전역 설치 시 `settings.json` 병합에 `python3`를 사용한다.
-> 미설치 환경에서는 설치가 중간에 실패하고 `settings.json`이 생성되지 않는다.
-> 설치 전 `python3 --version`으로 확인할 것.
+코드의 빌드와 테스트가 완료했다고 하더라고 변경된 기능(트랜잭션 경계, 권한 검사, 외부 부작용, 금액 계산)에 따라서는 사람이 직접 검수가 권장 됩니다. 
+AI agent 가 문법이나 컴파일 에러는 잡아낼 수 있을지 몰라도 도메인 적인 실수까지 잡아내기는 어렵다고 생각하여 해당 기능을 넣었습니다. 
+코드 검수 가이드는 Claude가 검수가 필요힌 영역을 변경했을 때 검토할 파일과 이유를 컨텍스트 종료 지점에서 응답으로 안내해줍니다.
 
-> ⚠️ **재설치 시 `.bak` 파일이 덮어써진다.**
-> `install.sh`는 기존 파일을 `.bak`으로 백업하지만, 재실행할 때마다 이전 `.bak`을 덮어쓴다.
-> 최초 설치 전 원본을 별도로 보존해야 한다면 수동으로 백업할 것.
+### 동작 순서
 
----
+1. Claude가 Java 코드를 변경하면 PreToolUse Hook이 변경 사실을 기록
+2. Hook이 컴파일과 관련 테스트를 실행
+3. 검증이 끝나면 실제 diff를 15개의 코드 검수 규칙으로 분석 (review-rules.json)
+4. Critical·High 신호가 있으면 `Stop hook feedback`으로 검수 내용 전달
+5. 같은 Claude가 검수 포인트 3~7개를 출력 (Hook 탐지 결과와 Agent 추가 의견은 분리해서 표시)
 
-## 코드 검수 가이드 (Spring Boot)
-
-빌드와 테스트가 통과해도 트랜잭션 경계, 권한 검사, 외부 부작용, 금액 계산처럼 **사람이 직접 확인해야 할 지점**은 남습니다. Claude가 이런 영역을 변경했을 때 "어디를 봐야 하는가"를 알려주는 기능입니다.
-
-**동작 방식:** Claude가 Java 코드를 변경하면 Stop 훅이 컴파일·테스트 완료 후 자동으로 diff를 분석합니다. Critical·High 위험 신호가 발견되면 오류가 아닌 `Stop hook feedback`으로 검수 내용을 전달하고, 같은 Claude가 **검수 포인트 3~7개**를 리포트로 출력합니다. 규칙 기반 Hook 탐지 결과와 Claude의 추가 검토 의견은 별도 영역으로 구분합니다.
+### 리포트 예시
 
 ```
 코드 검수 리포트
@@ -181,7 +299,9 @@ echo "/절대/경로/application.yml" > "$HOME/.claude/.file_edit_approved" # us
 - 컴파일 PASS / UserServiceTest PASS
 ```
 
-**규칙 분류 (`review-rules.json` — 15개):**
+### 탐지 규칙
+
+`review-rules.json`은 15개의 검수 관련 규칙을 위험도 별로 관리합니다.
 
 | 단계 | 대상 |
 |---|---|
@@ -195,18 +315,28 @@ Critical·High 규칙 탐지 → 리포트 생성. 대응 테스트 없음은 �
 
 ---
 
-## 보호 대상 파일 (Edit/Write 자동 차단)
 
-| 패턴 | 유형 |
-|---|---|
-| `application*.yml` | Spring Boot 설정 |
-| `.env`, `.env.*` | 환경변수 |
-| `.claude/settings.json` | 하네스 설정 |
-| `.claude/hooks/*.sh` | 훅 스크립트 |
+## 주의사항
+
+| 확인할 항목 | 내용                                                                                                                   |
+|---|------------------------------------------------------------------------------------------------------------------------|
+| `python3` | 전역 settings 병합과 프로젝트 Hook 경로 생성을 위해 필요합니다. 설치 전에 `python3 --version`으로 확인                 |
+| 저장소 이동 | 전역 Hook과 `CLAUDE.md` 심볼릭 링크가 깨질 수 있습니다. 이동 후 새 경로에서 `./install.sh`를 다시 실행해주셔야 합니다. |
+| `.bak` 보존 | 재설치할 때 이전 `.bak`도 새 백업으로 교체됩니다. 장기 보존이 필요한 원본은 설치 전에 별도로 복사해주세요.             |
+| 설치 대상 symlink | 프로젝트의 `.claude`, Skill 디렉터리 또는 대상 파일이 symlink면 외부 경로 덮어쓰기를 방지하기 위해 설치를 중단합니다.  |
+| `--skills-only` | 현재 Spring Boot 템플릿만 지원합니다. Vue에서 사용하면 오류로 종료돼요.                                                |
 
 ---
 
 ## 업데이트
+
+### v1.8.0 — 26.08.14
+- `spring-api-create`, `spring-api-update`, `spring-api-delete` Skill과 공통 참조 문서 추가
+- Spring API 추가·수정·삭제 시 프로젝트 구조 확인, 테스트 작성, 구현·리팩터링, API 명세·관련 문서 업데이트를 순서대로 진행
+- `install.sh --skills-only` 추가 — 기존 `CLAUDE.md`, 훅, settings를 유지하면서 Skill만 설치
+- Spring Boot `CLAUDE.md`에 Skill 라우팅과 실제 프로젝트 설정·기존 구조 우선 원칙 추가
+- Skill 구조, 설치 모드, 백업, 반복 설치, 공백·특수문자 경로와 symlink 차단 회귀 테스트 추가
+- README를 주요 기능, 전역/프로젝트 범위, 설치 모드, 승인·재실행 흐름 중심으로 개편
 
 ### v1.7.3 — 26.08.13
 - 코드 검수가 필요할 때 `Stop hook error` 대신 `Stop hook feedback`으로 안내
