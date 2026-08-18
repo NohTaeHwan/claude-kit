@@ -232,6 +232,10 @@ Skill만 추가하거나 업데이트할 때는 다음 명령을 사용하면 �
 ./install.sh --project /path/to/your-project spring-boot --skills-only
 ```
 
+### NVIDIA SkillSpector 보안 검사
+
+`spring-api-create`, `spring-api-update`, `spring-api-delete` Skill은 NVIDIA SkillSpector v2.9.5 검사에서 모두 `0/100`(LOW, SAFE)을 기록했으며, 보안 이슈가 발견되지 않았습니다.
+
 ---
 
 ## 프로젝트 템플릿 커스텀 가이드
