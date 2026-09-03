@@ -18,6 +18,7 @@ from review_guide import (
     load_rules,
     match_file_patterns,
     parse_diff_hunks,
+    find_symbol_near_line,
 )
 
 RULES_FILE = os.path.join(
@@ -285,6 +286,80 @@ class TestReviewGuide(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             report = json.loads(result.stdout)
             self.assertEqual(report['changedFiles'], [str(relative_path)])
+
+    def _analyze_java_diff(self, added_lines):
+        file_path = 'src/main/java/com/example/Example.java'
+        diff = (
+            f"--- a/{file_path}\n+++ b/{file_path}\n@@ -10,1 +10,{len(added_lines)} @@\n"
+            + ''.join(f'+{line}\n' for line in added_lines)
+        )
+        return analyze(self.rules, [file_path], {file_path: diff},
+                       'passed', 'passed', [])
+
+    def test_tc13_logic_rules_ignore_comments_and_javadoc(self):
+        result = self._analyze_java_diff([
+            '    // permitAll() Point WebClient.get()',
+            '    /** 나중에 설명할 Point WebClient.get() */',
+            '     * @Transactional(rollbackFor = Exception.class)',
+        ])
+        self.assertEqual(result['findings'], [])
+
+    def test_tc14_todo_placeholder_only_matches_line_comments(self):
+        comment = self._analyze_java_diff(['    // TODO: 나중에 처리', '    // 추후 보완'])
+        self.assertEqual(
+            [f['ruleId'] for f in comment['findings']], ['todo-placeholder']
+        )
+        javadoc = self._analyze_java_diff(['    /** 나중에 처리할 내용을 설명합니다. */'])
+        self.assertEqual(javadoc['findings'], [])
+        code_string = self._analyze_java_diff(['    String message = "TODO: 나중에 처리";'])
+        self.assertEqual(code_string['findings'], [])
+
+    def test_tc14b_legacy_placeholder_markers_remain_comment_only(self):
+        for marker in ('FIXME', 'HACK', '임시', 'placeholder'):
+            with self.subTest(marker=marker):
+                result = self._analyze_java_diff([f'    // {marker}: 처리 필요'])
+                self.assertEqual(
+                    [f['ruleId'] for f in result['findings']], ['todo-placeholder']
+                )
+
+    def test_tc15_point_rule_uses_word_boundaries(self):
+        camel_case = self._analyze_java_diff(['    int codePoint = 1;', '    int codePointCount = 2;'])
+        self.assertFalse(any(f['ruleId'] == 'amount-calculation-change'
+                             for f in camel_case['findings']))
+        for line in ('    int point = 1;', '    int pointBalance = 1;',
+                     '    usePoint();'):
+            with self.subTest(line=line):
+                identifier = self._analyze_java_diff([line])
+                self.assertTrue(any(f['ruleId'] == 'amount-calculation-change'
+                                    for f in identifier['findings']))
+
+    def test_tc16_external_call_does_not_match_collection_get(self):
+        collection = self._analyze_java_diff(['    value = list.get(0);', '    value = map.get("key");'])
+        self.assertFalse(any(f['ruleId'] == 'external-call-change'
+                             for f in collection['findings']))
+        for line in ('    return webClient.post().bodyValue(value);',
+                     '    return restTemplate.exchange(url, method, request, Type.class);'):
+            with self.subTest(line=line):
+                http = self._analyze_java_diff([line])
+                self.assertTrue(any(f['ruleId'] == 'external-call-change'
+                                    for f in http['findings']))
+        plain_post = self._analyze_java_diff(['    return client.post();'])
+        self.assertFalse(any(f['ruleId'] == 'external-call-change'
+                             for f in plain_post['findings']))
+
+    def test_tc17_body_match_uses_enclosing_method_not_next_method(self):
+        diff = (
+            '--- a/src/main/java/com/example/MarkdownChunking.java\n'
+            '+++ b/src/main/java/com/example/MarkdownChunking.java\n'
+            '@@ -5,9 +5,10 @@\n'
+            '     public void chunk() {\n'
+            '         int point = 1;\n'
+            '+        point++;\n'
+            '     }\n'
+            '     public void render() {\n'
+            '     }\n'
+        )
+        self.assertEqual(find_symbol_near_line(diff, 7), 'chunk')
 
 
 if __name__ == '__main__':

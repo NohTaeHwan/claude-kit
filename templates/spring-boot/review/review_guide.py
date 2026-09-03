@@ -107,6 +107,20 @@ def parse_diff_hunks(diff_text):
     return added
 
 
+# ── 주석 라인 판별 ────────────────────────────────────────────────────────────
+
+def _is_comment_or_javadoc_line(content):
+    """라인 전체가 일반 주석 또는 Javadoc인지 판별합니다."""
+    stripped = content.lstrip()
+    return stripped.startswith(('//', '/*', '*', '*/'))
+
+
+def _is_line_comment(content):
+    """라인에 // 주석이 있는지 판별합니다(인라인 주석도 포함)."""
+    stripped = content.lstrip()
+    return '//' in content and not stripped.startswith(('/*', '*', '*/'))
+
+
 # ── 심볼 탐색 ─────────────────────────────────────────────────────────────────
 
 _METHOD_PATTERN = re.compile(
@@ -128,6 +142,12 @@ def find_symbol_near_line(diff_text, line_number):
     max_ln = max(line_map.keys())
     search_range = list(range(line_number, min(line_number + 10, max_ln + 1))) + \
                    list(range(line_number - 1, max(line_number - 5, 0), -1))
+
+    # 메서드 본문은 앞의 선언이 enclosing symbol이고, 애너테이션은 뒤 선언에 붙습니다.
+    current_content = line_map.get(line_number, '').lstrip()
+    if not current_content.startswith('@'):
+        search_range = list(range(line_number - 1, max(line_number - 5, 0), -1)) + \
+                       list(range(line_number, min(line_number + 10, max_ln + 1)))
 
     for ln in search_range:
         content = line_map.get(ln, '')
@@ -159,6 +179,10 @@ def apply_rule(rule, file_path, diff_text):
             continue
 
         for line_no, content in added_lines:
+            if rule.get('excludeCommentLines', False) and _is_comment_or_javadoc_line(content):
+                continue
+            if rule.get('commentOnly', False) and not _is_line_comment(content):
+                continue
             if regex.search(content):
                 symbol = find_symbol_near_line(diff_text, line_no)
                 finding = {

@@ -334,6 +334,11 @@ Critical·High 규칙 탐지 → 리포트 생성. 대응 테스트 없음은 �
 
 ## 업데이트
 
+### v1.8.1 — 26.09.03
+- review-rules의 실제 로직 규칙이 일반 주석·Javadoc을 매칭하지 않도록 공통 필터 추가
+- TODO·나중에·추후 탐지를 `//` 주석으로 한정하고, `codePoint` 오탐 및 컬렉션 `get()` 오탐 제거
+- diff 매칭 줄의 enclosing method symbol 귀속 오류 수정 및 회귀 테스트 추가
+
 ### v1.8.0 — 26.08.14
 - `spring-api-create`, `spring-api-update`, `spring-api-delete` Skill과 공통 참조 문서 추가
 - Spring API 추가·수정·삭제 시 프로젝트 구조 확인, 테스트 작성, 구현·리팩터링, API 명세·관련 문서 업데이트를 순서대로 진행
