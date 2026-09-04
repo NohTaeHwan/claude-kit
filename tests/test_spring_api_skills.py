@@ -171,6 +171,9 @@ class TestSpringApiSkills(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assert_skills_installed(project)
             self.assertTrue((project / "CLAUDE.md").is_file())
+            self.assertTrue(
+                (project / ".claude" / "hooks" / "pre_tool_use_require_api_skill.sh").is_file()
+            )
             hook = project / ".claude" / "hooks" / "stop_build_check.sh"
             self.assertTrue(hook.is_file())
             hook.write_text('#!/bin/bash\ntouch "$(dirname "$0")/executed"\n', encoding="utf-8")
@@ -299,6 +302,8 @@ class TestSpringApiSkills(unittest.TestCase):
         content = (TEMPLATE_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
         for name in SKILL_NAMES:
             self.assertIn(name, content)
+        self.assertIn("Skill 매칭:", content)
+        self.assertIn("PreToolUse Hook", content)
         self.assertIn("프로젝트 설정", content)
         self.assertIn("기존 구조", content)
         self.assertNotIn("Java 17+", content)

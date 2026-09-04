@@ -339,6 +339,12 @@ Critical·High 규칙 탐지 → 리포트 생성. 대응 테스트 없음은 �
 - TODO·나중에·추후 탐지를 `//` 주석으로 한정하고, `codePoint` 오탐 및 컬렉션 `get()` 오탐 제거
 - diff 매칭 줄의 enclosing method symbol 귀속 오류 수정 및 회귀 테스트 추가
 
+### v1.9.0 — 26.09.04
+- Spring Boot 템플릿에 `pre_tool_use_require_api_skill.sh` 추가 — `Controller.java` 수정 전에 현재 세션 transcript에서 `spring-api-create/update/delete` Skill 호출 흔적을 확인하고, 없으면 Edit/Write 차단
+- Skill을 적용할 수 없는 API 작업 예외 상황을 위한 프로젝트별 일회성 승인 토큰 지원 및 API 범위 밖 Controller 작업의 명시적 비대상 선언 지원
+- Spring Boot `CLAUDE.md`에 구현 전 `Skill 매칭: [Skill명]` 출력 체크포인트 추가
+- API Skill 라우팅 Hook 회귀 테스트 추가
+
 ### v1.8.0 — 26.08.14
 - `spring-api-create`, `spring-api-update`, `spring-api-delete` Skill과 공통 참조 문서 추가
 - Spring API 추가·수정·삭제 시 프로젝트 구조 확인, 테스트 작성, 구현·리팩터링, API 명세·관련 문서 업데이트를 순서대로 진행

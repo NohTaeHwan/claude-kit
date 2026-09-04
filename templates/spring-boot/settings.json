@@ -18,6 +18,24 @@
             "command": "bash .claude/hooks/pre_tool_use_mark_code_change.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre_tool_use_require_api_skill.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre_tool_use_require_api_skill.sh"
+          }
+        ]
       }
     ],
     "Stop": [

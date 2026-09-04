@@ -49,6 +49,14 @@
 
 각 Skill은 이 파일의 프로젝트 고유 규칙과 참고 문서 이정표를 우선하고, 기존 Controller→Service→데이터 접근 구조를 유지한다.
 
+API 작업을 시작하기 전에 반드시 작업 유형과 Skill을 대조하고, 구현을 시작하는 응답에 다음 형식으로 먼저 남긴다.
+
+```text
+Skill 매칭: spring-api-create
+```
+
+실제 작업에 맞게 `spring-api-update` 또는 `spring-api-delete`로 바꿔 작성한다. API 작업이 아닌 경우에는 `Skill 매칭: 해당 없음 (API 작업 아님)`으로 명시한다. `Controller.java`를 Edit 또는 Write할 때 프로젝트 PreToolUse Hook이 현재 세션 transcript에서 세 Skill 중 하나의 호출 흔적 또는 Assistant의 비대상 선언을 확인한다. API 작업이면 Skill 호출 전에 Controller를 수정할 수 없으며, API 범위 밖의 작업은 비대상 선언 후 진행한다. Skill을 적용할 수 없는 API 작업 예외 상황은 사용자에게 사유와 영향을 설명하고 승인을 받은 뒤에만 일회성 토큰으로 우회한다.
+
 ---
 
 ## 프로젝트 커스텀 규칙 (아래에 추가)
